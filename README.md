@@ -27,7 +27,8 @@ Alle Daten liegen nur auf dem Gerät (localStorage). Sicherung und Übertragung 
 
 ## Cloud-Sicherung (Supabase)
 
-1. Im Supabase-Dashboard **SQL Editor** öffnen, Inhalt von `supabase/schema.sql` einfügen und ausführen.
+1. Im Supabase-Dashboard **SQL Editor** öffnen, Inhalt von `supabase/migrations/20261008000000_la_records.sql` einfügen und ausführen
+   (oder automatisch über die Supabase-GitHub-Integration mit „Deploy to production“).
 2. Unter **Project Settings → API** die *Project URL* und den *anon public* Key in `shared/config.js` eintragen,
    `CACHE` in `sw.js` hochzählen, committen.
 3. In der App auf der Übersicht unter *Datensicherung → Cloud* ein Konto erstellen (E-Mail + Passwort).

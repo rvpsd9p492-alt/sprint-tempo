@@ -1,5 +1,6 @@
 -- Leichtathletik-App: Cloud-Sicherung
--- Einmal im Supabase-Dashboard unter "SQL Editor" ausführen (New query → einfügen → Run).
+-- Wird über die Supabase-GitHub-Integration automatisch ausgeführt (Push auf main),
+-- alternativ von Hand im Supabase-Dashboard: SQL Editor → New query → einfügen → Run.
 -- Das Skript kann gefahrlos mehrfach ausgeführt werden.
 
 -- Ein Datensatz je Athlet, Ergebnis bzw. Einstellung, getrennt nach Benutzer.
