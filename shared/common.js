@@ -265,5 +265,5 @@
     results, saveResults, isWindy, isLegal,
     autoPBs, effectivePBs, setManual, resetToRecorded,
     backupStatus, exportBackup, parseBackup, applyBackup, shareOrDownload,
-    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.2" };
+    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.3" };
 })();

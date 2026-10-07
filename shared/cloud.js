@@ -19,7 +19,12 @@
   let syncing = false, timer = null, again = false;
   const listeners = new Set();
 
-  const ms = (t) => (t ? new Date(t).getTime() : 0);
+  // Postgres liefert Mikrosekunden (".123456+00:00"); Safari liest sicher nur Millisekunden.
+  const ms = (t) => {
+    if (!t) return 0;
+    const v = new Date(String(t).replace(/(\.\d{3})\d+/, "$1").replace(" ", "T").replace(/([+-]\d{2})$/, "$1:00")).getTime();
+    return isFinite(v) ? v : 0;
+  };
   const settingsHash = (o) => LA.hash(JSON.stringify(o || {}));
 
   function pending() {
