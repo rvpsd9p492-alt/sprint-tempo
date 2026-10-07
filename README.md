@@ -27,12 +27,16 @@ Alle Daten liegen nur auf dem Gerät (localStorage). Sicherung und Übertragung 
 
 ## Cloud-Sicherung (Supabase)
 
-1. Im Supabase-Dashboard **SQL Editor** öffnen, Inhalt von `supabase/migrations/20261008000000_la_records.sql` einfügen und ausführen
-   (oder automatisch über die Supabase-GitHub-Integration mit „Deploy to production“).
-2. Unter **Project Settings → API** die *Project URL* und den *anon public* Key in `shared/config.js` eintragen,
-   `CACHE` in `sw.js` hochzählen, committen.
-3. In der App auf der Übersicht unter *Datensicherung → Cloud* ein Konto erstellen (E-Mail + Passwort).
-4. Danach unter **Authentication → Sign In / Providers** „Allow new users to sign up“ ausschalten, damit niemand
+Eingerichtet mit dem Supabase-Projekt **Leichtathletik** (`hdtukcemlnhaoirdxitc`, eu-west-1):
+Tabelle `la_records` mit Row Level Security und Trigger ist angelegt, URL und Publishable Key stehen in `shared/config.js`.
+
+Für ein anderes Projekt: Migration aus `supabase/migrations/` ausführen (SQL Editor oder GitHub-Integration),
+unter **Project Settings → API Keys** *Project URL* und *Publishable key* in `shared/config.js` eintragen, `CACHE` in `sw.js` hochzählen.
+
+Danach:
+
+1. In der App auf der Übersicht unter *Datensicherung → Cloud* ein Konto erstellen (E-Mail + Passwort).
+2. Danach unter **Authentication → Sign In / Providers** „Allow new users to sign up“ ausschalten, damit niemand
    sonst Konten in deinem Projekt anlegt.
 
 Abgleich: je Athlet, Ergebnis und Einstellung; neuere Änderung gewinnt (auch serverseitig per Trigger),
