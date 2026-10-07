@@ -3,505 +3,142 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Sprint-Tempo</title>
-<meta name="description" content="Sprint-Sollzeiten aus Bestzeiten über ein physikalisches Geschwindigkeitsmodell.">
+<title>Leichtathletik</title>
+<meta name="description" content="Leichtathletik-Werkzeuge: Sprint-Tempo-Rechner und Wettkampfergebnisse.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Sprint-Tempo">
+<meta name="apple-mobile-web-app-title" content="Leichtathletik">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#E9EEF2" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0E1824" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="shared/base.css">
 <style>
-@font-face{font-family:"Barlow";font-weight:400;font-style:normal;font-display:swap;src:url(fonts/barlow-400.woff2) format("woff2")}
-@font-face{font-family:"Barlow";font-weight:500;font-style:normal;font-display:swap;src:url(fonts/barlow-500.woff2) format("woff2")}
-@font-face{font-family:"Barlow";font-weight:600;font-style:normal;font-display:swap;src:url(fonts/barlow-600.woff2) format("woff2")}
-@font-face{font-family:"Barlow Condensed";font-weight:500;font-style:normal;font-display:swap;src:url(fonts/barlow-condensed-500.woff2) format("woff2")}
-@font-face{font-family:"Barlow Condensed";font-weight:600;font-style:normal;font-display:swap;src:url(fonts/barlow-condensed-600.woff2) format("woff2")}
-@font-face{font-family:"Barlow Condensed";font-weight:700;font-style:normal;font-display:swap;src:url(fonts/barlow-condensed-700.woff2) format("woff2")}
-:root{
-  --bg:#E9EEF2; --surface:#FFFFFF; --ink:#13202E; --muted:#5B6B7B; --line:#C9D3DC;
-  --track:#1E4A7A; --track-ink:#FFFFFF; --signal:#F2C230; --signal-ink:#2A2000;
-  --lock:#9AA6B2; --warn:#B23A2E; --ok:#2E7D4F; --link:#1E4A7A;
-  color-scheme:light dark;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#0E1824; --surface:#172536; --ink:#E6EDF3; --muted:#93A3B4; --line:#2A3D52;
-    --track:#2D68A8; --track-ink:#FFFFFF; --signal:#F2C230; --signal-ink:#2A2000;
-    --lock:#4F5F70; --warn:#E06A5C; --ok:#5DBB86; --link:#8DB8E8;
-  }
-}
-:root[data-theme="dark"]{
-  --bg:#0E1824; --surface:#172536; --ink:#E6EDF3; --muted:#93A3B4; --line:#2A3D52;
-  --track:#2D68A8; --track-ink:#FFFFFF; --signal:#F2C230; --signal-ink:#2A2000;
-  --lock:#4F5F70; --warn:#E06A5C; --ok:#5DBB86; --link:#8DB8E8;
-}
-*,*::before,*::after{box-sizing:border-box}
-[hidden]{display:none!important}
-html{background:var(--bg);-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.45 "Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
-  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);
-  -webkit-tap-highlight-color:transparent}
-main{max-width:560px;margin:0 auto;padding:16px 16px 40px}
-h1{font:700 30px/1 "Barlow Condensed","Arial Narrow",sans-serif;margin:8px 0 2px;letter-spacing:.2px}
-h2{font:600 20px/1.2 "Barlow Condensed","Arial Narrow",sans-serif;margin:0 0 10px}
-.sub{color:var(--muted);font-size:14px;margin:0 0 16px}
-section{background:var(--surface);border-radius:14px;padding:16px;margin-bottom:12px}
-.lbl{font-size:13px;color:var(--muted);margin:12px 0 6px}
-.lbl:first-child{margin-top:0}
-.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-.chips::-webkit-scrollbar{display:none}
-.chips button,.seg button{flex:0 0 auto;border:1px solid var(--line);background:transparent;color:var(--ink);
-  font:600 15px "Barlow",sans-serif;padding:8px 12px;border-radius:8px;cursor:pointer}
-.chips button[aria-pressed="true"],.seg button[aria-pressed="true"]{background:var(--track);border-color:var(--track);color:var(--track-ink)}
-.seg{display:flex;gap:6px;flex-wrap:wrap}
-.seg button{flex:1 1 0}
-.seg button:disabled{opacity:.4;cursor:default}
-button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--signal);outline-offset:2px}
-.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-input[type=number],input[type=text]{font:500 16px "Barlow",sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
-.inline{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:15px}
-.inline input{width:90px}
-
-/* Anzeigetafel */
-.board{background:var(--track);color:var(--track-ink);border-radius:14px;padding:18px 16px 14px;margin-bottom:12px;position:relative;overflow:hidden}
-.board::before,.board::after{content:"";position:absolute;left:0;right:0;height:2px;background:rgba(255,255,255,.55)}
-.board::before{top:10px}.board::after{bottom:10px}
-.board .meta{font-size:14px;opacity:.85}
-.board .time{font:700 76px/1 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:1px;margin:6px 0 2px;font-variant-numeric:tabular-nums}
-.board .time small{font-size:30px;margin-left:4px;opacity:.8}
-.board .win{font-size:15px}
-.board .zone{display:inline-block;margin-top:8px;background:var(--signal);color:var(--signal-ink);font-weight:600;font-size:14px;padding:3px 9px;border-radius:6px}
-input[type=range]{width:100%;accent-color:var(--signal);margin:14px 0 2px}
-.ticks{display:flex;justify-content:space-between;font-size:12px;opacity:.8}
-
-/* Tabelle */
-.lanes{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-.lanes td{padding:9px 6px;border-bottom:1px solid var(--line)}
-.lanes tr{cursor:pointer}
-.lanes tr:last-child td{border-bottom:0}
-.lanes .pct{font:700 20px "Barlow Condensed",sans-serif;width:64px;white-space:nowrap}
-.lanes .t{font:700 22px "Barlow Condensed",sans-serif;text-align:right;white-space:nowrap}
-.lanes .z{color:var(--muted);font-size:13px}
-.lanes tr.cur td{background:color-mix(in srgb,var(--signal) 22%,transparent)}
-
-.out{font:700 34px/1.1 "Barlow Condensed",sans-serif;margin-top:8px}
-.note{font-size:14px;color:var(--muted);margin:8px 0 0}
-.warn{color:var(--warn);font-weight:600}
-.ok{color:var(--ok);font-weight:600}
-.grid3{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-.grid3 label{font-size:13px;color:var(--muted);display:block}
-details{background:var(--surface);border-radius:14px;margin-bottom:12px}
-details>summary{cursor:pointer;padding:14px 16px;font:600 20px "Barlow Condensed",sans-serif;list-style:none}
-details>summary::-webkit-details-marker{display:none}
-details>summary::after{content:"+";float:right;font-weight:500}
-details[open]>summary::after{content:"–"}
-details .in{padding:0 16px 16px}
-.kv{width:100%;border-collapse:collapse;font-size:15px;font-variant-numeric:tabular-nums}
-.kv td{padding:5px 0;border-bottom:1px solid var(--line)}
-.kv td:last-child{text-align:right;font-weight:600}
-.src{font-size:14px;line-height:1.5}
-.src p{margin:0 0 8px}
-.tag{font-weight:600;font-size:12px;padding:1px 6px;border-radius:5px;border:1px solid var(--line);margin-right:4px;white-space:nowrap}
-.athinfo{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;font-size:15px;font-variant-numeric:tabular-nums}
-.link{background:none;border:0;color:var(--link);font:600 15px "Barlow",sans-serif;cursor:pointer;padding:4px 0}
-.chips button.add{border-style:dashed;color:var(--muted)}
-.fl{font-size:13px;color:var(--muted);display:block;margin-bottom:4px}
-.btn{border:1px solid var(--line);background:transparent;color:var(--ink);font:600 15px "Barlow",sans-serif;padding:9px 14px;border-radius:8px;cursor:pointer}
-.btn.primary{background:var(--track);border-color:var(--track);color:var(--track-ink)}
-.btn.danger{color:var(--warn);margin-left:auto}
-.btn.danger.armed{background:var(--warn);border-color:var(--warn);color:#fff}
-#athEdit{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
-.err{background:var(--warn);color:#fff;border-radius:10px;padding:10px 12px;margin-bottom:12px}
-.foot{font-size:13px;color:var(--muted);text-align:center;margin-top:16px}
-@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+.hero{background:var(--track);color:var(--track-ink);border-radius:14px;padding:22px 16px 18px;margin-bottom:12px;position:relative;overflow:hidden}
+.hero::before,.hero::after{content:"";position:absolute;left:0;right:0;height:2px;background:rgba(255,255,255,.55)}
+.hero::before{top:10px}.hero::after{bottom:10px}
+.hero h1{font-size:40px;margin:0}
+.hero p{margin:4px 0 0;opacity:.85;font-size:15px}
+.tiles{display:grid;gap:12px;margin-bottom:12px}
+.tile{display:flex;gap:14px;align-items:center;background:var(--surface);border-radius:14px;padding:16px;color:var(--ink);text-decoration:none;min-height:96px}
+.tile:active{transform:scale(.99)}
+.tile .ic{flex:0 0 56px;height:56px;border-radius:12px;display:grid;place-items:center;background:var(--track)}
+.tile .ic.alt{background:var(--clay)}
+.tile .ic svg{width:32px;height:32px}
+.tile .tx{flex:1;min-width:0}
+.tile h2{margin:0 0 2px;font-size:22px}
+.tile .d{display:block;font-size:14px;color:var(--muted)}
+.tile .st{display:block;font-size:13px;color:var(--ink);margin-top:4px;font-variant-numeric:tabular-nums}
+.tile .go{color:var(--muted);font-size:26px}
+.tile.soon{opacity:.55;pointer-events:none}
+.tile.soon .ic{background:var(--line)}
 </style>
 </head>
 <body>
 <main>
-  <h1>Sprint-Tempo-Rechner</h1>
-  <p class="sub">Sollzeiten aus deinen Bestzeiten, über ein physikalisches Geschwindigkeitsmodell statt linear.</p>
-
-  <div class="err" id="err" hidden></div>
-  <section aria-label="Athlet" id="athBox">
-    <div class="lbl">Athlet</div>
-    <div class="chips" id="athChips"></div>
-    <div class="athinfo" id="athInfo">
-      <span id="athPB"></span>
-      <button class="link" id="athEditBtn">Bearbeiten</button>
-    </div>
-    <div id="athEdit" hidden>
-      <h2 id="athEditHead">Athlet anlegen</h2>
-      <label class="fl" for="aName">Name</label>
-      <input type="text" id="aName" maxlength="40" autocomplete="off">
-      <div class="grid3" style="margin-top:10px">
-        <div><label for="a60">60 m (s)</label><input type="text" id="a60" inputmode="decimal" autocomplete="off"></div>
-        <div><label for="a100">100 m (s)</label><input type="text" id="a100" inputmode="decimal" autocomplete="off"></div>
-        <div><label for="a200">200 m (s)</label><input type="text" id="a200" inputmode="decimal" autocomplete="off"></div>
-        <div><label for="a400">400 m (optional)</label><input type="text" id="a400" inputmode="decimal" placeholder="leer" autocomplete="off"></div>
-      </div>
-      <p class="note">Elektronisch gemessene Wettkampfzeiten der aktuellen Saison.</p>
-      <p class="note warn" id="aMsg"></p>
-      <div class="row" style="margin-top:10px">
-        <button class="btn primary" id="aSave">Speichern</button>
-        <button class="btn" id="aCancel">Abbrechen</button>
-        <button class="btn danger" id="aDel">Löschen</button>
-      </div>
-    </div>
-  </section>
-
-  <div id="calc">
-  <section aria-label="Lauf wählen">
-    <div class="lbl">Strecke</div>
-    <div class="chips" id="dist"></div>
-    <div class="inline"><span>Eigene Strecke</span><input type="number" id="customD" min="20" max="400" step="5" inputmode="numeric" placeholder="m"> m</div>
-
-    <div class="lbl">Start</div>
-    <div class="seg" id="start">
-      <button data-v="block">Tiefstart</button>
-      <button data-v="hoch">Hochstart</button>
-      <button data-v="fly">Fliegend</button>
-    </div>
-    <div class="inline" id="flyBox" hidden><span>Anlauf</span><input type="number" id="runin" min="10" max="40" step="5" inputmode="numeric"> m</div>
-
-    <div class="lbl">Zeitmessung</div>
-    <div class="seg" id="timing">
-      <button data-v="hand">Hand</button>
-      <button data-v="elec">Elektronisch</button>
-      <button data-v="race">Wettkampf</button>
-    </div>
-  </section>
-
-  <div class="board" aria-live="polite">
-    <div class="meta" id="bMeta"></div>
-    <div class="time" id="bTime"></div>
-    <div class="win" id="bWin"></div>
-    <span class="zone" id="bZone"></span>
-    <input type="range" id="pct" min="60" max="100" step="1" aria-label="Intensität in Prozent">
-    <div class="ticks"><span>60 %</span><span>70</span><span>80</span><span>90</span><span>100 %</span></div>
+  <div class="hero">
+    <h1>Leichtathletik</h1>
+    <p>Training planen, Wettkämpfe festhalten.</p>
   </div>
 
-  <section aria-label="Intensitätstabelle">
-    <h2 id="tblHead">Sollzeiten</h2>
-    <table class="lanes" id="lanes"></table>
-    <p class="note" id="refNote"></p>
-  </section>
-
-  <section aria-label="Rückrechnung">
-    <h2>Gelaufene Zeit einordnen</h2>
-    <div class="inline" style="margin-top:0"><span>Gestoppt</span><input type="text" id="ran" inputmode="decimal" placeholder="s" autocomplete="off"> s</div>
-    <div class="out" id="ranOut">–</div>
-    <p class="note" id="ranNote">Gilt für die oben gewählte Strecke, Startart und Messung.</p>
-  </section>
-
-  <details>
-    <summary>Modell und Annahmen</summary>
-    <div class="in">
-      <table class="kv" id="model"></table>
-      <div class="lbl">Stellschrauben</div>
-      <div class="grid3">
-        <div><label for="rt">Reaktionszeit im Wettkampf (s)</label><input type="text" inputmode="decimal" id="rt"></div>
-        <div><label for="hochPen">Hochstart-Zuschlag (s)</label><input type="text" inputmode="decimal" id="hochPen"></div>
-        <div><label for="handStd">Handzeit-Abzug Steh-/Tiefstart (s)</label><input type="text" inputmode="decimal" id="handStd"></div>
-        <div><label for="handFly">Handzeit-Abzug fliegend (s)</label><input type="text" inputmode="decimal" id="handFly"></div>
-        <div><label for="kExt">Exponent über 200 m (ohne 400 m)</label><input type="text" inputmode="decimal" id="kExt"></div>
-        <div><label for="tol">Messtoleranz Hand (± s)</label><input type="text" inputmode="decimal" id="tol"></div>
-      </div>
-      <div class="row" style="margin-top:12px"><button class="btn" id="resetSet">Standardwerte</button></div>
-    </div>
-  </details>
-
-  <details>
-    <summary>Methodik</summary>
-    <div class="in src">
-      <p><span class="tag">Sicher</span>Geschwindigkeitsverlauf nach dem Kraftmodell von Hill/Keller mit linear abnehmender Vortriebskraft (Tibshirani 1997, „Who is the fastest man in the world?“, The American Statistician 51:106–111). Drei Parameter – Startkraft f₀, Ermüdungsrate c, Zeitkonstante τ – werden exakt aus 60/100/200 m bestimmt.</p>
-      <p><span class="tag">Sicher</span>Intensität = Prozent der Durchschnittsgeschwindigkeit der jeweiligen Bestleistungs-Äquivalenz (Konvention nach Francis/Seagrave; identisch mit Sprintulator). Sollzeit = Referenzzeit ÷ Intensität.</p>
-      <p><span class="tag">Wahrscheinlich</span>Bis 200 m interpoliert das Modell zuverlässig. Darüber Potenzgesetz zwischen 200 und 400 m; ohne 400-m-Zeit mit festem Exponenten – das ist eine Schätzung.</p>
-      <p><span class="tag">Wahrscheinlich</span>Die 200-m-Kurve ist im Fit enthalten. Gerade Strecken auf der Geraden sind real etwas schneller als modelliert.</p>
-      <p><span class="tag">Vermutung</span>Hochstart-Zuschlag und Handzeit-Abzüge sind Erfahrungswerte; mit Freelap-/Videovergleich kalibrieren.</p>
-    </div>
-  </details>
+  <div class="banner" id="bkBanner" hidden>
+    <span id="bkBannerTxt"></span>
+    <button class="btn primary" id="bkBannerBtn">Jetzt sichern</button>
   </div>
 
-  <details id="backup">
-    <summary>Daten sichern &amp; übertragen</summary>
-    <div class="in">
-      <p class="note" style="margin-top:0">Athleten und Einstellungen liegen nur auf diesem Gerät. Mit einer Sicherungsdatei kannst du sie aufs iPad oder einen anderen Browser übertragen – oder nach dem Löschen der App wiederherstellen.</p>
-      <div class="row" style="margin-top:12px">
-        <button class="btn primary" id="exp">Sicherung exportieren</button>
-        <button class="btn" id="impBtn">Sicherung importieren</button>
-        <input type="file" id="impFile" accept=".json,application/json" hidden>
-      </div>
-      <p class="note" id="bkMsg"></p>
+  <nav class="tiles" aria-label="Module">
+    <a class="tile" href="tempo/">
+      <span class="ic" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none" stroke="#F2C230" stroke-width="3" stroke-linecap="round"><circle cx="17" cy="18" r="10"/><path d="M17 18l5-6M14 4h6"/><path d="M3 14h5M2 19h5M4 24h5" stroke="#fff"/></svg>
+      </span>
+      <span class="tx">
+        <h2>Sprint-Tempo</h2>
+        <span class="d">Sollzeiten aus Bestzeiten nach Intensität</span>
+        <span class="st" id="stTempo"></span>
+      </span>
+      <span class="go" aria-hidden="true">›</span>
+    </a>
+    <a class="tile" href="ergebnisse/">
+      <span class="ic alt" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5h12v7a6 6 0 0 1-12 0z"/><path d="M10 8H5a5 5 0 0 0 5 5M22 8h5a5 5 0 0 1-5 5M16 18v5M11 27h10"/></svg>
+      </span>
+      <span class="tx">
+        <h2>Wettkampfergebnisse</h2>
+        <span class="d">Ergebnisse erfassen, filtern, Bestleistungen</span>
+        <span class="st" id="stRes"></span>
+      </span>
+      <span class="go" aria-hidden="true">›</span>
+    </a>
+    <div class="tile soon" aria-hidden="true">
+      <span class="ic"></span>
+      <span class="tx"><h2>Weitere Module</h2><span class="d">folgen</span></span>
     </div>
-  </details>
+  </nav>
 
-  <p class="foot" id="foot">Version <span id="ver">1.0</span> · <span id="offState">Offline-Modus wird vorbereitet …</span></p>
+  <section aria-labelledby="bkHead">
+    <h2 id="bkHead">Datensicherung</h2>
+    <p class="note" style="margin-top:0" id="bkState"></p>
+    <p class="note">Alle Daten liegen nur auf diesem Gerät. Wird die App vom Home-Bildschirm gelöscht, sind sie weg – deshalb regelmäßig sichern, z. B. in iCloud Drive. Über dieselbe Datei überträgst du alles aufs iPad oder den PC.</p>
+    <div class="row" style="margin-top:12px">
+      <button class="btn primary" id="exp">Sicherung exportieren</button>
+      <button class="btn" id="impBtn">Sicherung importieren</button>
+      <input type="file" id="impFile" accept=".json,application/json" hidden>
+    </div>
+    <p class="note" id="bkMsg" aria-live="polite"></p>
+  </section>
+
+  <p class="foot">Version <span id="ver"></span> · <span id="offState">Offline-Modus wird vorbereitet …</span></p>
 </main>
-
+<script src="shared/common.js"></script>
 <script>
 (function(){
 "use strict";
-const DISTS=[30,40,50,60,80,100,120,150,200,250,300];
-const PCTS=[70,75,80,85,90,95,100];
-const STORE="sprintTempo.v1";
-const DEF={athletes:[],cur:null,rt:0.16,hochPen:0.10,handStd:0.15,handFly:0.00,kExt:1.10,tol:0.10,
-  dist:150,start:"hoch",timing:"hand",runin:20,pct:80};
-const SETKEYS=["rt","hochPen","handStd","handFly","kExt","tol"];
-const KEYS=["athletes","cur",...SETKEYS,"dist","start","timing","runin","pct"];
-let S=Object.assign({},DEF);
-try{const raw=localStorage.getItem(STORE); if(raw) Object.assign(S,JSON.parse(raw));}catch(e){}
-sanitize();
-
-function sanitize(){
-  if(!Array.isArray(S.athletes)) S.athletes=[];
-  S.athletes=S.athletes.filter(a=>a&&typeof a.id==="string"&&typeof a.name==="string"&&a.pb60>0&&a.pb100>0&&a.pb200>0);
-  SETKEYS.forEach(k=>{if(typeof S[k]!=="number"||!isFinite(S[k])) S[k]=DEF[k];});
-  if(!["block","hoch","fly"].includes(S.start)) S.start=DEF.start;
-  if(!["hand","elec","race"].includes(S.timing)) S.timing=DEF.timing;
-  if(!(S.dist>=20&&S.dist<=400)) S.dist=DEF.dist;
-  if(!(S.runin>=5&&S.runin<=60)) S.runin=DEF.runin;
-  if(!(S.pct>=60&&S.pct<=100)) S.pct=DEF.pct;
-  if(!S.athletes.find(a=>a.id===S.cur)) S.cur=S.athletes[0]?S.athletes[0].id:null;
-}
-const curAth=()=>S.athletes.find(a=>a.id===S.cur)||null;
-const snap=()=>{const o={};KEYS.forEach(k=>{if(S[k]!==undefined)o[k]=S[k];});return o;};
-function save(){try{localStorage.setItem(STORE,JSON.stringify(snap()));}catch(e){}}
-
 const $=id=>document.getElementById(id);
-const fmt=t=>isFinite(t)?t.toFixed(2).replace(".",","):"–";
-const fmt1=t=>isFinite(t)?t.toFixed(1).replace(".",","):"–";
-const num=v=>{const s=String(v).trim().replace(",","."); if(s==="") return null; const x=Number(s); return isFinite(x)?x:null;};
-const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-
-/* ---------- Modell ---------- */
-let M=null;
-function fitModel(){
-  const P=curAth();
-  if(!P) return {error:"Leg zuerst einen Athleten mit seinen Bestzeiten an.",empty:true};
-  const RT=S.rt, T60=P.pb60-RT, T100=P.pb100-RT, T200=P.pb200-RT;
-  if(!(T60>0&&T100>T60&&T200>T100)) return {error:"Bestzeiten unplausibel: 60 m < 100 m < 200 m nötig."};
-  const AB=(t,tau)=>{const g=t-tau*(1-Math.exp(-t/tau));return [tau*g, tau*tau*g - tau*t*t/2];};
-  const solve=tau=>{const [a1,b1]=AB(T60,tau),[a2,b2]=AB(T100,tau),det=a1*b2-a2*b1;
-    const f0=(60*b2-100*b1)/det, c=(a1*100-a2*60)/det, [a3,b3]=AB(T200,tau);
-    return {f0,c,r:f0*a3+c*b3-200};};
-  let lo=0.2,hi=6;
-  if(!(solve(lo).r>0&&solve(hi).r<0)) return {error:"Modell lässt sich mit diesen Zeiten nicht anpassen. Bitte Eingaben prüfen."};
-  for(let i=0;i<80;i++){const m=(lo+hi)/2; if(solve(m).r>0) lo=m; else hi=m;}
-  const tau=lo,{f0,c}=solve(tau),K=f0*tau+c*tau*tau;
-  const d=t=>K*(t-tau*(1-Math.exp(-t/tau)))-c*tau*t*t/2;
-  const v=t=>K*(1-Math.exp(-t/tau))-c*tau*t;
-  const tPeak=-tau*Math.log(c*tau*tau/K), vmax=v(tPeak), dPeak=d(tPeak);
-  let k=S.kExt, k400=false;
-  if(P.pb400 && P.pb400>P.pb200){k=Math.log(P.pb400/P.pb200)/Math.LN2; k400=true;}
-  const T200full=P.pb200;
-  function tMove(D){ // Zeit ab erster Bewegung, Tiefstart
-    if(D<=200){let a=0,b=T200+1;for(let i=0;i<70;i++){const m=(a+b)/2; if(d(m)<D) a=m; else b=m;} return (a+b)/2;}
-    return T200full*Math.pow(D/200,k)-RT;
-  }
-  return {tau,f0,c,K,vmax,tPeak,dPeak,k,k400,d,v,tMove};
-}
-
-/* Referenzzeit (100 %) in Bewegungszeit, ohne Messkorrektur */
-function refMove(D){
-  if(S.start==="fly") return M.tMove(D+S.runin)-M.tMove(S.runin);
-  return M.tMove(D)+(S.start==="hoch"?S.hochPen:0);
-}
-function measOffset(){
-  if(S.timing==="race") return S.start==="fly"?0:S.rt;
-  if(S.timing==="hand") return -(S.start==="fly"?S.handFly:S.handStd);
-  return 0;
-}
-function target(D,p){return refMove(D)/(p/100)+measOffset();}
-function zone(p){
-  if(p<75) return "Tempo extensiv";
-  if(p<90) return "Mittelzone · submaximal";
-  if(p<95) return "Schnelligkeit submaximal";
-  return "Maximalschnelligkeit";
-}
-
-/* ---------- UI ---------- */
-function buildChips(){
-  const el=$("dist");
-  el.innerHTML=DISTS.map(D=>'<button data-v="'+D+'">'+D+' m</button>').join("");
-  el.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.dist=+b.dataset.v;$("customD").value="";render();});
-}
-function bindSeg(id,key){
-  $(id).addEventListener("click",e=>{const b=e.target.closest("button");if(!b||b.disabled)return;S[key]=b.dataset.v;render();});
-}
-function fillSettings(){SETKEYS.forEach(k=>{$(k).value=String(S[k]).replace(".",",");});}
-function bindSettings(){
-  SETKEYS.forEach(k=>{
-    $(k).addEventListener("input",()=>{const v=num($(k).value); if(v===null) return; S[k]=v; M=null; render();});
-  });
-  $("resetSet").addEventListener("click",()=>{SETKEYS.forEach(k=>S[k]=DEF[k]); fillSettings(); M=null; render();});
-}
-function setPressed(id,val){[...$(id).querySelectorAll("button")].forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v==String(val))));}
+$("ver").textContent=LA.VERSION;
 
 function render(){
-  if(S.timing==="race"&&S.start!=="block") S.timing="elec";
-  if(!M) M=fitModel();
-  renderAth();
-  const err=$("err");
-  if(M.error){
-    err.textContent=M.error; err.hidden=!!M.empty; $("calc").hidden=true;
-    if(M.empty&&$("athEdit").hidden) openEdit(null);
-    M=null; save(); return;
+  const t=LA.load(LA.KEYS.tempo,{})||{}, ath=(t.athletes||[]).length;
+  $("stTempo").textContent=ath?ath+" Athlet"+(ath===1?"":"en"):"";
+  const res=LA.load(LA.KEYS.results,[])||[];
+  if(res.length){
+    const last=res.map(r=>r.date).sort().pop();
+    $("stRes").textContent=res.length+" Ergebnis"+(res.length===1?"":"se")+" · zuletzt "+LA.fmtDate(last);
+  } else $("stRes").textContent="";
+
+  const s=LA.backupStatus();
+  if(s.empty){ $("bkState").textContent="Noch keine Daten vorhanden."; $("bkBanner").hidden=true; }
+  else if(s.upToDate){ $("bkState").innerHTML='<span class="ok">Alles gesichert</span> am '+LA.fmtDate(s.lastAt)+"."; $("bkBanner").hidden=true; }
+  else {
+    $("bkState").innerHTML='<span class="warn">Änderungen seit '+(s.lastAt?"der letzten Sicherung ("+LA.fmtDate(s.lastAt)+")":"Beginn")+" nicht gesichert.</span>";
+    $("bkBannerTxt").textContent=s.lastAt?"Neue Daten seit der letzten Sicherung.":"Deine Daten sind noch nicht gesichert.";
+    $("bkBanner").hidden=false;
   }
-  err.hidden=true; $("calc").hidden=false;
-
-  setPressed("dist",S.dist); setPressed("start",S.start); setPressed("timing",S.timing);
-  $("timing").querySelector('[data-v="race"]').disabled=(S.start!=="block");
-  $("flyBox").hidden=S.start!=="fly";
-  if(document.activeElement!==$("runin")) $("runin").value=S.runin;
-  $("pct").value=S.pct;
-
-  const D=S.dist;
-  const startTxt={block:"Tiefstart",hoch:"Hochstart",fly:"fliegend, "+S.runin+" m Anlauf"}[S.start];
-  const timTxt={hand:"Handzeit",elec:"elektronisch ab Bewegung",race:"Wettkampf inkl. Reaktion"}[S.timing];
-  const t=target(D,S.pct);
-  $("bMeta").textContent=curAth().name+" · "+D+" m · "+startTxt+" · "+timTxt+" · "+S.pct+" %";
-  $("bTime").innerHTML=fmt(t)+"<small>s</small>";
-  if(S.timing==="hand"){
-    const tol=S.tol, ref=refMove(D), off=measOffset();
-    const pFast=ref/(t-tol-off)*100, pSlow=ref/(t+tol-off)*100;
-    $("bWin").textContent="Zielfenster "+fmt(t-tol)+"–"+fmt(t+tol)+" s ≙ "+fmt1(pSlow)+"–"+fmt1(Math.min(pFast,100))+" %";
-  } else $("bWin").textContent="Zielfenster "+fmt(t-0.03)+"–"+fmt(t+0.03)+" s";
-  $("bZone").textContent=zone(S.pct);
-
-  $("tblHead").textContent="Sollzeiten "+D+" m";
-  $("lanes").innerHTML=PCTS.map(p=>
-    '<tr data-p="'+p+'" class="'+(p===S.pct?"cur":"")+'"><td class="pct">'+p+' %</td><td class="z">'+zone(p)+'</td><td class="t">'+fmt(target(D,p))+' s</td></tr>'
-  ).join("");
-  $("refNote").textContent="100 %-Referenz für diese Bedingungen: "+fmt(refMove(D)+measOffset())+" s. Wettkampf-Äquivalent aus dem Tiefstart: "+fmt(M.tMove(D)+S.rt)+" s"+(D>200?" (extrapoliert)":"")+".";
-
-  // Rückrechnung
-  const ran=num($("ran").value);
-  if(ran>0){
-    const p=refMove(D)/(ran-measOffset())*100;
-    $("ranOut").textContent=fmt1(p)+" %";
-    if(p>100) $("ranNote").innerHTML='<span class="warn">Schneller als die Modell-Bestleistung – Messung prüfen oder Bestzeiten aktualisieren.</span>';
-    else $("ranNote").textContent=zone(p);
-  } else {$("ranOut").textContent="–";$("ranNote").textContent="Gilt für die oben gewählte Strecke, Startart und Messung.";}
-
-  // Modell
-  const v100=M.v(M.tMove(100));
-  $("model").innerHTML=[
-    ["Zeitkonstante τ",M.tau.toFixed(3)+" s"],
-    ["Startkraft f₀",M.f0.toFixed(2)+" m/s²"],
-    ["Ermüdungsrate c",M.c.toFixed(3)+" m/s³"],
-    ["Max. Geschwindigkeit",M.vmax.toFixed(2)+" m/s ("+(M.vmax*3.6).toFixed(1)+" km/h)"],
-    ["Erreicht bei",M.dPeak.toFixed(0)+" m / "+M.tPeak.toFixed(2)+" s"],
-    ["Geschw. bei 100 m",v100.toFixed(2)+" m/s ("+((1-v100/M.vmax)*100).toFixed(0)+" % Abfall)"],
-    ["Exponent > 200 m",M.k.toFixed(3)+(M.k400?" (aus 400 m)":" (Annahme)")],
-    ["Äquivalent 80 / 120 / 150 m",fmt(M.tMove(80)+S.rt)+" / "+fmt(M.tMove(120)+S.rt)+" / "+fmt(M.tMove(150)+S.rt)+" s"]
-  ].map(r=>"<tr><td>"+r[0]+"</td><td>"+r[1].replace(/\./g,",")+"</td></tr>").join("");
-  save();
 }
-
-/* ---------- Athleten ---------- */
-let editId=null, delTimer=null;
-function disarmDel(){const b=$("aDel"); b.dataset.armed=""; b.textContent="Löschen"; b.classList.remove("armed"); clearTimeout(delTimer);}
-const dec=v=>v==null?"":String(v).replace(".",",");
-function renderAth(){
-  $("athChips").innerHTML=S.athletes.map(a=>'<button data-id="'+esc(a.id)+'" aria-pressed="'+(a.id===S.cur)+'">'+esc(a.name)+'</button>').join("")
-    +'<button class="add" data-id="__new">+ Neu</button>';
-  const a=curAth();
-  $("athInfo").hidden=!a;
-  if(a) $("athPB").textContent="60 m "+fmt(a.pb60)+" · 100 m "+fmt(a.pb100)+" · 200 m "+fmt(a.pb200)+(a.pb400?" · 400 m "+fmt(a.pb400):"");
+async function doExport(){
+  const r=await LA.exportBackup();
+  if(r.res==="aborted") return;
+  $("bkMsg").textContent=r.res==="shared"?"Sicherung „"+r.name+"“ geteilt.":"Sicherung „"+r.name+"“ gespeichert.";
+  render();
 }
-function openEdit(id){
-  editId=id; const a=id?S.athletes.find(x=>x.id===id):null;
-  $("athEditHead").textContent=a?"Athlet bearbeiten":"Athlet anlegen";
-  $("aName").value=a?a.name:""; $("a60").value=a?dec(a.pb60):""; $("a100").value=a?dec(a.pb100):"";
-  $("a200").value=a?dec(a.pb200):""; $("a400").value=a&&a.pb400?dec(a.pb400):"";
-  disarmDel(); $("aDel").hidden=!a; $("aCancel").hidden=S.athletes.length===0; $("aMsg").textContent="";
-  $("athEdit").hidden=false;
-}
-function closeEdit(){$("athEdit").hidden=true;}
-$("athChips").addEventListener("click",e=>{
-  const b=e.target.closest("button"); if(!b) return;
-  if(b.dataset.id==="__new"){openEdit(null);$("aName").focus();return;}
-  S.cur=b.dataset.id; M=null; closeEdit(); render();
-});
-$("athEditBtn").addEventListener("click",()=>{openEdit(S.cur);$("aName").focus();});
-$("aCancel").addEventListener("click",closeEdit);
-$("aSave").addEventListener("click",()=>{
-  const name=$("aName").value.trim(), p60=num($("a60").value), p100=num($("a100").value), p200=num($("a200").value), p400=num($("a400").value);
-  let msg="";
-  if(!name) msg="Name fehlt.";
-  else if(!(p60>0&&p100>0&&p200>0)) msg="60, 100 und 200 m sind Pflicht.";
-  else if(!(p60<p100&&p100<p200)) msg="Zeiten unplausibel: 60 m < 100 m < 200 m.";
-  else if($("a400").value.trim()!==""&&p400===null) msg="400-m-Zeit ist keine Zahl.";
-  else if(p400!==null&&!(p400>p200)) msg="400-m-Zeit muss über der 200-m-Zeit liegen.";
-  if(msg){$("aMsg").textContent=msg;return;}
-  const rec={name,pb60:p60,pb100:p100,pb200:p200,pb400:p400};
-  const ex=editId&&S.athletes.find(x=>x.id===editId);
-  if(ex) Object.assign(ex,rec);
-  else {const id="a"+Date.now().toString(36)+Math.random().toString(36).slice(2,6); S.athletes.push(Object.assign({id},rec)); S.cur=id;}
-  M=null; closeEdit(); render();
-});
-$("aDel").addEventListener("click",()=>{
-  const a=S.athletes.find(x=>x.id===editId); if(!a) return;
-  const btn=$("aDel");
-  if(btn.dataset.armed!=="1"){
-    btn.dataset.armed="1"; btn.textContent=a.name+" wirklich löschen?"; btn.classList.add("armed");
-    clearTimeout(delTimer); delTimer=setTimeout(disarmDel,4000); return;
-  }
-  disarmDel();
-  S.athletes=S.athletes.filter(x=>x.id!==editId);
-  if(S.cur===editId) S.cur=S.athletes[0]?S.athletes[0].id:null;
-  M=null; closeEdit(); render();
-});
-
-/* ---------- Sicherung ---------- */
-$("exp").addEventListener("click",async()=>{
-  const json=JSON.stringify({app:"sprint-tempo",v:1,exported:new Date().toISOString(),state:snap()},null,2);
-  const name="sprint-tempo-"+new Date().toISOString().slice(0,10)+".json";
-  const file=new File([json],name,{type:"application/json"});
-  try{
-    if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:"Sprint-Tempo Sicherung"}); $("bkMsg").textContent="Sicherung geteilt."; return;}
-  }catch(e){ if(e&&e.name==="AbortError") return; }
-  const url=URL.createObjectURL(file), a=document.createElement("a");
-  a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),2000);
-  $("bkMsg").textContent="Sicherung „"+name+"“ gespeichert.";
-});
+$("exp").addEventListener("click",doExport);
+$("bkBannerBtn").addEventListener("click",doExport);
 $("impBtn").addEventListener("click",()=>$("impFile").click());
 $("impFile").addEventListener("change",async e=>{
   const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f) return;
-  try{
-    const d=JSON.parse(await f.text()), st=d&&d.state;
-    if(!st||!Array.isArray(st.athletes)) throw new Error("format");
-    const n=st.athletes.length;
-    if(!confirm("Sicherung mit "+n+" Athlet"+(n===1?"":"en")+" laden? Die Daten auf diesem Gerät werden ersetzt.")) return;
-    S=Object.assign({},DEF,st); sanitize(); fillSettings(); M=null; closeEdit(); render();
-    $("bkMsg").innerHTML='<span class="ok">'+S.athletes.length+" Athlet"+(S.athletes.length===1?"":"en")+" importiert.</span>";
-  }catch(err){ $("bkMsg").innerHTML='<span class="warn">Datei ist keine gültige Sprint-Tempo-Sicherung.</span>'; }
+  let b;
+  try{ b=LA.parseBackup(await f.text()); }
+  catch(err){ $("bkMsg").innerHTML='<span class="warn">Datei ist keine gültige Sicherung.</span>'; return; }
+  const na=b.tempo&&Array.isArray(b.tempo.athletes)?b.tempo.athletes.length:0, nr=b.results.length;
+  if(!confirm("Sicherung mit "+na+" Athlet"+(na===1?"":"en")+" und "+nr+" Ergebnis"+(nr===1?"":"sen")+" übernehmen?\n\nVorhandene Einträge bleiben erhalten, gleiche Einträge werden aktualisiert.")) return;
+  const r=LA.applyBackup(b);
+  $("bkMsg").innerHTML='<span class="ok">Übernommen: '+r.athletes+" Athlet"+(r.athletes===1?"":"en")+", "+r.results+" Ergebnis"+(r.results===1?"":"se")+".</span>";
+  render();
 });
-
-/* ---------- Start ---------- */
-buildChips(); bindSeg("start","start"); bindSeg("timing","timing"); fillSettings(); bindSettings();
-$("runin").addEventListener("input",e=>{const v=+e.target.value;if(v>=5&&v<=60){S.runin=v;render();}});
-$("customD").addEventListener("input",e=>{const v=+e.target.value;if(v>=20&&v<=400){S.dist=v;render();}});
-$("pct").addEventListener("input",e=>{S.pct=+e.target.value;render();});
-$("lanes").addEventListener("click",e=>{const tr=e.target.closest("tr");if(!tr)return;S.pct=+tr.dataset.p;render();});
-$("ran").addEventListener("input",render);
+window.addEventListener("pageshow",render);
 render();
-
-/* ---------- Offline ---------- */
-const off=$("offState");
-if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
-if("serviceWorker" in navigator && location.protocol!=="file:"){
-  navigator.serviceWorker.register("sw.js").then(reg=>{
-    const ready=()=>{off.textContent="offline verfügbar";};
-    if(reg.active) ready();
-    navigator.serviceWorker.ready.then(ready);
-  }).catch(()=>{off.textContent="Offline-Modus nicht verfügbar";});
-} else off.textContent="Offline-Modus nicht verfügbar";
+LA.registerOffline("./",s=>{$("offState").textContent=s;});
 })();
 </script>
 </body>

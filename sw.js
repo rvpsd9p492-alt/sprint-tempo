@@ -1,9 +1,13 @@
 // Offline-Cache: alles wird beim ersten Besuch geladen; danach kommt die App aus dem Cache
 // und aktualisiert sich im Hintergrund, sobald Netz da ist (beim nächsten Start aktiv).
-const CACHE = "sprint-tempo-v1";
+// Bei jeder Änderung an den Dateien CACHE hochzählen, damit Geräte die neue Version vollständig laden.
+const CACHE = "leichtathletik-v2";
 const ASSETS = [
   "./",
-  "index.html",
+  "tempo/",
+  "ergebnisse/",
+  "shared/base.css",
+  "shared/common.js",
   "manifest.webmanifest",
   "icons/apple-touch-icon.png",
   "icons/icon-192.png",
@@ -18,7 +22,11 @@ const ASSETS = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  event.waitUntil(
+    caches.open(CACHE)
+      .then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: "reload" }))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", (event) => {
@@ -29,17 +37,26 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// Seiten werden unter ihrer Ordner-Adresse gecacht ("tempo/" statt "tempo/index.html").
+function cacheKey(req) {
+  const url = new URL(req.url);
+  url.hash = "";
+  url.search = "";
+  if (url.pathname.endsWith("/index.html")) url.pathname = url.pathname.slice(0, -"index.html".length);
+  return url.href;
+}
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET" || new URL(req.url).origin !== self.location.origin) return;
-  const key = req.mode === "navigate" ? "index.html" : req;
+  const key = cacheKey(req);
 
   event.respondWith(
     caches.open(CACHE).then(async (cache) => {
-      const cached = await cache.match(key, { ignoreSearch: true });
+      const cached = await cache.match(key);
       const update = fetch(req)
         .then((res) => {
-          if (res.ok) cache.put(key, res.clone());
+          if (res.ok && !res.redirected) cache.put(key, res.clone());
           return res;
         })
         .catch(() => undefined);
@@ -47,7 +64,13 @@ self.addEventListener("fetch", (event) => {
         event.waitUntil(update);
         return cached;
       }
-      return (await update) || new Response("Offline", { status: 503, statusText: "Offline" });
+      const res = await update;
+      if (res) return res;
+      if (req.mode === "navigate") {
+        const home = await cache.match(new URL("./", self.registration.scope).href);
+        if (home) return home;
+      }
+      return new Response("Offline", { status: 503, statusText: "Offline" });
     })
   );
 });
