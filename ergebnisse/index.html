@@ -187,7 +187,9 @@
 </div>
 </main>
 
+<script src="../shared/config.js"></script>
 <script src="../shared/common.js"></script>
+<script src="../shared/cloud.js"></script>
 <script>
 (function(){
 "use strict";
@@ -495,7 +497,7 @@ $("form").addEventListener("submit",e=>{
 $("fDel").addEventListener("click",()=>{
   const b=$("fDel");
   if(b.dataset.armed!=="1"){ b.dataset.armed="1"; b.textContent="Wirklich löschen?"; b.classList.add("armed"); delTimer=setTimeout(disarmDel,4000); return; }
-  R=R.filter(x=>x.id!==editId); persist(); closeForm();
+  R=R.filter(x=>x.id!==editId); persist(); LA.trackDelete("result",editId); closeForm();
 });
 $("fCancel").addEventListener("click",closeForm);
 $("fCancelTop").addEventListener("click",e=>{e.preventDefault(); closeForm();});
@@ -524,6 +526,7 @@ function route(){
   }
 }
 window.addEventListener("hashchange",route);
+window.addEventListener("la:synced",()=>{ R=LA.results(); ATH=LA.athletes(); if(!$("viewList").hidden) renderList(); });
 window.addEventListener("pageshow",e=>{ if(e.persisted){ R=LA.results(); ATH=LA.athletes(); route(); } });
 
 $("ver").textContent=LA.VERSION;

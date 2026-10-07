@@ -25,6 +25,18 @@ Offline-Web-App mit mehreren Leichtathletik-Modulen.
 Alle Daten liegen nur auf dem Gerät (localStorage). Sicherung und Übertragung auf andere Geräte über
 **Datensicherung** auf der Übersichtsseite (JSON-Datei; Import führt zusammen, löscht nichts).
 
+## Cloud-Sicherung (Supabase)
+
+1. Im Supabase-Dashboard **SQL Editor** öffnen, Inhalt von `supabase/schema.sql` einfügen und ausführen.
+2. Unter **Project Settings → API** die *Project URL* und den *anon public* Key in `shared/config.js` eintragen,
+   `CACHE` in `sw.js` hochzählen, committen.
+3. In der App auf der Übersicht unter *Datensicherung → Cloud* ein Konto erstellen (E-Mail + Passwort).
+4. Danach unter **Authentication → Sign In / Providers** „Allow new users to sign up“ ausschalten, damit niemand
+   sonst Konten in deinem Projekt anlegt.
+
+Abgleich: je Athlet, Ergebnis und Einstellung; neuere Änderung gewinnt (auch serverseitig per Trigger),
+Löschungen werden übertragen. Offline-Änderungen werden beim nächsten Online-Start nachgeholt.
+
 ## Entwicklung
 
 - Gemeinsames Design: `shared/base.css`, gemeinsame Funktionen (Speicher, Sicherung, Offline): `shared/common.js`

@@ -1,7 +1,9 @@
 /* Gemeinsame Funktionen aller Leichtathletik-Module: Athleten, Ergebnisse, Bestzeiten, Sicherung, Offline. */
 (function () {
   "use strict";
-  const KEYS = { athletes: "laAthletes.v1", tempo: "sprintTempo.v1", results: "laResults.v1", meta: "laMeta.v1" };
+  const KEYS = { athletes: "laAthletes.v1", tempo: "sprintTempo.v1", results: "laResults.v1", meta: "laMeta.v1",
+    deleted: "laDeleted.v1", cloud: "laCloud.v1" };
+  const SYNCED = [KEYS.athletes, KEYS.results, KEYS.tempo];
   const TEMPO_SETTINGS = ["rt", "hochPen", "handStd", "handFly", "kExt", "tol"];
   /** Sprintstrecken, deren Bestzeiten Sprint-Tempo nutzt (Schlüssel = Strecke in m). */
   const SPRINT = { "60": "60 m", "100": "100 m", "200": "200 m", "400": "400 m" };
@@ -12,7 +14,17 @@
     try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : def; } catch (e) { return def; }
   }
   function save(key, val) {
-    try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch (e) { return false; }
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { return false; }
+    // Cloud-Sicherung über Änderungen informieren (synchronisiert verzögert im Hintergrund)
+    if (SYNCED.includes(key)) window.dispatchEvent(new CustomEvent("la:changed", { detail: { key } }));
+    return true;
+  }
+  /** Merkt eine Löschung vor, damit sie auch auf anderen Geräten ankommt. */
+  function trackDelete(kind, id) {
+    const list = load(KEYS.deleted, []) || [];
+    list.push({ kind, id, at: new Date().toISOString() });
+    save(KEYS.deleted, list);
+    window.dispatchEvent(new CustomEvent("la:changed", { detail: { key: KEYS.deleted } }));
   }
   const newId = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
@@ -57,6 +69,7 @@
   }
   function deleteAthlete(id) {
     saveAthletes(athletes().filter((a) => a.id !== id));
+    trackDelete("athlete", id);
     const res = results();
     let changed = false;
     res.forEach((r) => { if (r.athleteId === id) { r.athleteId = null; r.updatedAt = new Date().toISOString(); changed = true; } });
@@ -144,7 +157,10 @@
   function backupStatus() {
     const m = load(KEYS.meta, {}) || {};
     const c = { athletes: athletes().length, results: results().length };
-    return { empty: c.athletes + c.results === 0, upToDate: m.lastFp === fingerprint(), lastAt: m.lastAt || null, ...c };
+    const cloud = window.LA && LA.cloud ? LA.cloud.status() : null;
+    const cloudSafe = !!(cloud && cloud.loggedIn && cloud.clean);
+    return { empty: c.athletes + c.results === 0, upToDate: cloudSafe || m.lastFp === fingerprint(),
+      fileUpToDate: m.lastFp === fingerprint(), cloudSafe, lastAt: m.lastAt || null, ...c };
   }
   function markBackedUp() {
     const m = load(KEYS.meta, {}) || {};
@@ -244,10 +260,10 @@
 
   migrate();
 
-  window.LA = { KEYS, SPRINT, SPRINT_DISTS, PB_MONTHS, load, save, newId,
+  window.LA = { KEYS, SPRINT, SPRINT_DISTS, PB_MONTHS, load, save, newId, trackDelete, hash, tempoSettings, TEMPO_SETTINGS,
     athletes, saveAthletes, upsertAthlete, deleteAthlete, athleteName,
     results, saveResults, isWindy, isLegal,
     autoPBs, effectivePBs, setManual, resetToRecorded,
     backupStatus, exportBackup, parseBackup, applyBackup, shareOrDownload,
-    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.1" };
+    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.2" };
 })();

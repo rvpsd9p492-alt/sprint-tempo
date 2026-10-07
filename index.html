@@ -34,6 +34,11 @@
 .tile .go{color:var(--muted);font-size:26px}
 .tile.soon{opacity:.55;pointer-events:none}
 .tile.soon .ic{background:var(--line)}
+h3{font:600 17px "Barlow Condensed",sans-serif;margin:16px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+h3:first-of-type{margin-top:4px}
+.cloudst{display:flex;align-items:center;gap:8px;font-size:15px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex:0 0 10px}
+.dot.ok{background:var(--ok)}.dot.busy{background:var(--signal)}.dot.err{background:var(--warn)}
 </style>
 </head>
 <body>
@@ -90,8 +95,32 @@
 
   <section aria-labelledby="bkHead">
     <h2 id="bkHead">Datensicherung</h2>
+    <div id="cloudBox" hidden>
+      <h3>Cloud</h3>
+      <div id="cloudOut">
+        <p class="note" style="margin-top:0">Mit einem Konto werden Athleten und Ergebnisse automatisch gesichert und zwischen iPhone, iPad und PC abgeglichen.</p>
+        <label class="fl" for="cEmail">E-Mail</label>
+        <input type="text" id="cEmail" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false">
+        <label class="fl" for="cPw">Passwort</label>
+        <input type="password" id="cPw" autocomplete="current-password" style="font:500 16px Barlow,sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-height:42px">
+        <div class="row" style="margin-top:12px">
+          <button class="btn primary" id="cIn">Anmelden</button>
+          <button class="btn" id="cUp">Konto erstellen</button>
+        </div>
+      </div>
+      <div id="cloudIn" hidden>
+        <div class="cloudst"><span class="dot" id="cDot"></span><span id="cState"></span></div>
+        <p class="note" id="cWho"></p>
+        <div class="row" style="margin-top:12px">
+          <button class="btn primary" id="cSync">Jetzt synchronisieren</button>
+          <button class="btn" id="cOut">Abmelden</button>
+        </div>
+      </div>
+      <p class="note" id="cMsg" aria-live="polite"></p>
+      <h3>Datei</h3>
+    </div>
     <p class="note" style="margin-top:0" id="bkState"></p>
-    <p class="note">Alle Daten liegen nur auf diesem Gerät. Wird die App vom Home-Bildschirm gelöscht, sind sie weg – deshalb regelmäßig sichern, z. B. in iCloud Drive. Über dieselbe Datei überträgst du alles aufs iPad oder den PC.</p>
+    <p class="note" id="bkInfo">Alle Daten liegen nur auf diesem Gerät. Wird die App vom Home-Bildschirm gelöscht, sind sie weg – deshalb regelmäßig sichern, z. B. in iCloud Drive. Über dieselbe Datei überträgst du alles aufs iPad oder den PC.</p>
     <div class="row" style="margin-top:12px">
       <button class="btn primary" id="exp">Sicherung exportieren</button>
       <button class="btn" id="impBtn">Sicherung importieren</button>
@@ -102,7 +131,9 @@
 
   <p class="foot">Version <span id="ver"></span> · <span id="offState">Offline-Modus wird vorbereitet …</span></p>
 </main>
+<script src="shared/config.js"></script>
 <script src="shared/common.js"></script>
+<script src="shared/cloud.js"></script>
 <script>
 (function(){
 "use strict";
@@ -120,7 +151,11 @@ function render(){
   } else $("stRes").textContent="";
 
   const s=LA.backupStatus();
+  $("bkInfo").textContent=s.cloudSafe
+    ?"Zusätzlich zur Cloud kannst du eine Sicherungsdatei anlegen, z. B. vor größeren Änderungen."
+    :"Alle Daten liegen nur auf diesem Gerät. Wird die App vom Home-Bildschirm gelöscht, sind sie weg – deshalb regelmäßig sichern, z. B. in iCloud Drive. Über dieselbe Datei überträgst du alles aufs iPad oder den PC.";
   if(s.empty){ $("bkState").textContent="Noch keine Daten vorhanden."; $("bkBanner").hidden=true; }
+  else if(s.cloudSafe){ $("bkState").textContent=s.lastAt?"Letzte Sicherungsdatei: "+LA.fmtDate(s.lastAt)+".":"Noch keine Sicherungsdatei angelegt."; $("bkBanner").hidden=true; }
   else if(s.upToDate){ $("bkState").innerHTML='<span class="ok">Alles gesichert</span> am '+LA.fmtDate(s.lastAt)+"."; $("bkBanner").hidden=true; }
   else {
     $("bkState").innerHTML='<span class="warn">Änderungen seit '+(s.lastAt?"der letzten Sicherung ("+LA.fmtDate(s.lastAt)+")":"Beginn")+" nicht gesichert.</span>";
@@ -149,6 +184,45 @@ $("impFile").addEventListener("change",async e=>{
   render();
 });
 window.addEventListener("pageshow",render);
+
+/* ---------- Cloud ---------- */
+const C=LA.cloud;
+function fmtTs(iso){ const d=new Date(iso); return LA.fmtDate(iso)+", "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")+" Uhr"; }
+function renderCloud(x){
+  $("cloudBox").hidden=!x.configured;
+  if(!x.configured) return;
+  $("cloudOut").hidden=x.loggedIn; $("cloudIn").hidden=!x.loggedIn;
+  if(!x.loggedIn){ if(x.error) $("cMsg").innerHTML='<span class="warn">'+LA.esc(x.error)+"</span>"; return; }
+  const dot=$("cDot");
+  if(x.syncing){ dot.className="dot busy"; $("cState").textContent="Synchronisiere …"; }
+  else if(x.error){ dot.className="dot err"; $("cState").textContent="Fehler: "+x.error; }
+  else if(x.pending){ dot.className="dot busy"; $("cState").textContent=LA.plural(x.pending,"Änderung","Änderungen")+" noch nicht in der Cloud"+(navigator.onLine===false?" – offline":""); }
+  else if(x.lastSyncAt){ dot.className="dot ok"; $("cState").textContent="Alles in der Cloud gesichert"; }
+  else { dot.className="dot"; $("cState").textContent="Noch nicht synchronisiert"; }
+  $("cWho").textContent="Angemeldet als "+x.email+(x.lastSyncAt?" · zuletzt synchronisiert "+fmtTs(x.lastSyncAt):"");
+  $("cSync").disabled=x.syncing;
+}
+async function auth(fn){
+  const email=$("cEmail").value.trim(), pw=$("cPw").value;
+  if(!/^\S+@\S+\.\S+$/.test(email)){ $("cMsg").innerHTML='<span class="warn">Bitte eine gültige E-Mail-Adresse eingeben.</span>'; return; }
+  if(pw.length<8){ $("cMsg").innerHTML='<span class="warn">Passwort mit mindestens 8 Zeichen eingeben.</span>'; return; }
+  $("cIn").disabled=$("cUp").disabled=true; $("cMsg").textContent="Bitte warten …";
+  try{
+    const r=await fn(email,pw);
+    $("cPw").value="";
+    if(r&&r.confirmed===false) $("cMsg").innerHTML='<span class="ok">Konto angelegt.</span> Bitte den Link in der Bestätigungs-Mail öffnen und dich danach hier anmelden.';
+    else $("cMsg").textContent="";
+  }catch(e){ $("cMsg").innerHTML='<span class="warn">'+LA.esc(e.message)+"</span>"; }
+  $("cIn").disabled=$("cUp").disabled=false;
+  render();
+}
+$("cIn").addEventListener("click",()=>auth(C.signIn));
+$("cUp").addEventListener("click",()=>auth(C.signUp));
+$("cSync").addEventListener("click",async()=>{ $("cMsg").textContent=""; const x=await C.sync({force:true}); if(x.error) $("cMsg").innerHTML='<span class="warn">'+LA.esc(x.error)+"</span>"; else if(x.pending&&navigator.onLine===false) $("cMsg").textContent="Offline – wird synchronisiert, sobald Internet da ist."; render(); });
+$("cOut").addEventListener("click",()=>{ if(confirm("Abmelden? Die Daten bleiben auf diesem Gerät erhalten.")) { C.signOut(); $("cMsg").textContent=""; render(); } });
+C.onStatus(x=>{ renderCloud(x); render(); });
+window.addEventListener("la:synced",render);
+renderCloud(C.status());
 render();
 LA.registerOffline("./",s=>{$("offState").textContent=s;});
 })();

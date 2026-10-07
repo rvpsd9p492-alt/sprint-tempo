@@ -252,7 +252,9 @@ details .in{padding:0 16px 16px}
   <p class="foot" id="foot">Version <span id="ver">2.0</span> · <span id="offState">Offline-Modus wird vorbereitet …</span></p>
 </main>
 
+<script src="../shared/config.js"></script>
 <script src="../shared/common.js"></script>
+<script src="../shared/cloud.js"></script>
 <script>
 (function(){
 "use strict";
@@ -496,6 +498,12 @@ render();
 const off=$("offState");
 // Aus dem Verlauf zurück: Daten neu laden, falls auf der Übersicht importiert wurde
 window.addEventListener("pageshow",e=>{if(e.persisted) location.reload();});
+// Nach Cloud-Abgleich: Athleten, Ergebnisse und Stellschrauben neu einlesen
+window.addEventListener("la:synced",()=>{
+  ATH=LA.athletes(); RES=LA.results();
+  const t=LA.load(LA.KEYS.tempo,{})||{}; SETKEYS.forEach(k=>{if(typeof t[k]==="number") S[k]=t[k];});
+  sanitize(); fillSettings(); M=null; if($("pbEdit").hidden) render(); else renderAth();
+});
 LA.registerOffline("../",t=>{off.textContent=t;});
 })();
 </script>
