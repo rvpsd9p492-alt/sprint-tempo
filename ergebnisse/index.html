@@ -44,6 +44,11 @@
 .hint{font-size:13px;color:var(--muted);margin:4px 0 0}
 .formbtns{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
 .formbtns .primary{flex:1 1 auto}
+.chk{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:15px;cursor:pointer}
+.chk input{width:22px;height:22px;accent-color:var(--track)}
+.res .who{font-weight:600;color:var(--ink)}
+.pbs .who{font:600 15px "Barlow",sans-serif;color:var(--muted);padding-top:12px}
+.link{color:var(--link);font:600 14px "Barlow",sans-serif;text-decoration:none}
 </style>
 </head>
 <body>
@@ -61,8 +66,9 @@
 
   <section aria-label="Filter" id="filterBox">
     <div class="grid2">
-      <div><label class="fl" for="fYear" style="margin-top:0">Jahr</label><select id="fYear"></select></div>
-      <div><label class="fl" for="fVenue" style="margin-top:0">Halle / Freiluft</label>
+      <div style="grid-column:1/-1"><label class="fl" for="fAth" style="margin-top:0">Athlet</label><select id="fAth"></select></div>
+      <div><label class="fl" for="fYear">Jahr</label><select id="fYear"></select></div>
+      <div><label class="fl" for="fVenue">Halle / Freiluft</label>
         <select id="fVenue"><option value="">Alle</option><option value="indoor">Halle</option><option value="outdoor">Freiluft</option></select></div>
       <div><label class="fl" for="fDisc">Disziplin</label><select id="fDisc"></select></div>
       <div><label class="fl" for="fChamp">Meisterschaft</label><select id="fChamp"></select></div>
@@ -73,10 +79,18 @@
     </div>
   </section>
 
+  <section id="unBox" hidden>
+    <p class="note" style="margin-top:0" id="unTxt"></p>
+    <div class="row" style="margin-top:10px;flex-wrap:nowrap">
+      <select id="unAth" aria-label="Athlet für nicht zugeordnete Ergebnisse"></select>
+      <button class="btn primary" id="unGo">Zuordnen</button>
+    </div>
+  </section>
+
   <section id="pbBox" aria-labelledby="pbHead" hidden>
     <h2 id="pbHead">Bestleistungen</h2>
     <table class="pbs" id="pbTable"></table>
-    <p class="note">Ohne Ergebnisse mit Rückenwind über +2,0 m/s.</p>
+    <p class="note">Ohne Rückenwind über +2,0 m/s und ohne Handzeiten.</p>
   </section>
 
   <div id="list"></div>
@@ -99,7 +113,10 @@
 
   <form id="form" novalidate autocomplete="off">
   <section>
-    <div class="grid2">
+    <div class="row" style="justify-content:space-between"><label class="fl" for="iAth" style="margin:0">Athlet</label><a class="link" href="../athleten/?back=ergebnisse">Athleten verwalten</a></div>
+    <select id="iAth" style="margin-top:6px"></select>
+    <p class="hint" id="noAthHint" hidden>Noch keine Athleten angelegt – <a class="link" href="../athleten/?back=ergebnisse#neu">jetzt anlegen</a>.</p>
+    <div class="grid2" style="margin-top:12px">
       <div>
         <label class="fl" for="iDate" style="margin-top:0">Datum</label>
         <input type="date" id="iDate" required>
@@ -139,6 +156,7 @@
         </div>
       </div>
     </div>
+    <label class="chk" id="handBox"><input type="checkbox" id="iHand"> handgestoppt</label>
     <p class="hint" id="iMarkHint"></p>
   </section>
 
@@ -198,13 +216,13 @@ const discOrder=name=>DISC.has(name)?DISC.get(name).order:1000;
 const better=(kind,a,b)=>kind==="t"?a<b:a>b;
 
 /* ---------- Daten ---------- */
-let R=LA.load(LA.KEYS.results,[]);
-if(!Array.isArray(R)) R=[];
+let R=LA.results(), ATH=LA.athletes();
+const aName=id=>LA.athleteName(id,ATH)||"Ohne Athlet";
 function persist(){
   if(!LA.save(LA.KEYS.results,R)) alert("Speichern fehlgeschlagen – Gerätespeicher voll?");
 }
 const FKEY="laResults.filters";
-let F=Object.assign({year:"",disc:"",champ:"",venue:""},LA.load(FKEY,{}));
+let F=Object.assign({ath:"",year:"",disc:"",champ:"",venue:""},LA.load(FKEY,{}));
 
 /* ---------- Ergebnis lesen & formatieren ---------- */
 const STATUS={DNF:"DNF",AUFG:"DNF",DNS:"DNS",DQ:"DQ",DISQ:"DQ",NM:"o.g.V.",OGV:"o.g.V.",NHL:"o.g.V."};
@@ -255,18 +273,17 @@ function parseWind(raw,sign){
   return {value:Math.round(v*10)/10};
 }
 const fmtWind=w=>(w<0?"−":"+")+Math.abs(w).toFixed(1).replace(".",",");
-const windy=r=>r.wind!=null&&r.wind>2.0;
-const legal=r=>r.value!=null&&!windy(r);
+const windy=LA.isWindy, legal=LA.isLegal;
 const venueTxt=v=>v==="indoor"?"Halle":"Freiluft";
 const isChamp=r=>!!(r.champ&&r.champ.trim());
 
 /* ---------- Bestleistungen ---------- */
-function bestOf(list){ // je Disziplin das beste gültige Ergebnis (bei Gleichstand das frühere)
+function bestOf(list){ // je Athlet und Disziplin das beste gültige Ergebnis (bei Gleichstand das frühere)
   const best=new Map();
   list.forEach(r=>{
     if(!legal(r)) return;
-    const b=best.get(r.discipline);
-    if(!b||better(r.kind,r.value,b.value)||(r.value===b.value&&r.date<b.date)) best.set(r.discipline,r);
+    const k=(r.athleteId||"")+"|"+r.discipline, b=best.get(k);
+    if(!b||better(r.kind,r.value,b.value)||(r.value===b.value&&r.date<b.date)) best.set(k,r);
   });
   return best;
 }
@@ -284,6 +301,9 @@ function buildFilters(){
   const years=[...new Set(R.map(r=>r.date.slice(0,4)))].sort().reverse();
   const discs=[...new Set(R.map(r=>r.discipline))].sort((a,b)=>discOrder(a)-discOrder(b)||a.localeCompare(b,"de"));
   const champs=[...new Set(R.filter(isChamp).map(r=>r.champ.trim()))].sort((a,b)=>a.localeCompare(b,"de"));
+  if(F.ath&&F.ath!=="__none"&&!ATH.some(a=>a.id===F.ath)) F.ath="";
+  const hasNone=R.some(r=>!r.athleteId);
+  $("fAth").innerHTML=opt("","Alle",F.ath)+ATH.map(a=>opt(a.id,a.name,F.ath)).join("")+(hasNone||F.ath==="__none"?opt("__none","Ohne Athlet",F.ath):"");
   if(F.year&&!years.includes(F.year)) F.year="";
   if(F.disc&&!discs.includes(F.disc)) F.disc="";
   if(F.champ&&!["__yes","__no"].includes(F.champ)&&!champs.includes(F.champ)) F.champ="";
@@ -295,6 +315,7 @@ function buildFilters(){
 }
 function filtered(){
   return R.filter(r=>
+    (!F.ath||(F.ath==="__none"?!r.athleteId:r.athleteId===F.ath))&&
     (!F.year||r.date.slice(0,4)===F.year)&&
     (!F.disc||r.discipline===F.disc)&&
     (!F.venue||r.venue===F.venue)&&
@@ -303,17 +324,20 @@ function filtered(){
 }
 function renderList(){
   buildFilters();
-  const list=filtered(), active=!!(F.year||F.disc||F.champ||F.venue);
+  const list=filtered(), active=!!(F.ath||F.year||F.disc||F.champ||F.venue);
+  const single=!!F.ath; // nur ein Athlet sichtbar → Namen nicht wiederholen
   $("filterBox").hidden=R.length===0;
   $("fReset").hidden=!active;
   $("count").textContent=active?list.length+" von "+R.length+" Ergebnissen":R.length+" Ergebnis"+(R.length===1?"":"se");
 
   // Bestleistungen der aktuellen Auswahl
-  const best=[...bestOf(list).values()].sort((a,b)=>discOrder(a.discipline)-discOrder(b.discipline)||a.discipline.localeCompare(b.discipline,"de"));
+  const best=[...bestOf(list).values()].sort((a,b)=>aName(a.athleteId).localeCompare(aName(b.athleteId),"de")||discOrder(a.discipline)-discOrder(b.discipline)||a.discipline.localeCompare(b.discipline,"de"));
   $("pbBox").hidden=best.length===0;
   $("pbHead").textContent=active?"Bestleistungen in dieser Auswahl":"Bestleistungen";
+  let lastWho=null;
   $("pbTable").innerHTML=best.map(r=>
-    "<tr><td>"+esc(r.discipline)+'<div class="dt">'+LA.fmtDate(r.date)+" · "+venueTxt(r.venue)+(r.wind!=null?" · "+fmtWind(r.wind):"")+'</div></td><td class="m">'+esc(r.mark)+" "+unit(r)+"</td></tr>"
+    (!single&&r.athleteId!==lastWho?(lastWho=r.athleteId,'<tr><td colspan="2" class="who">'+esc(aName(r.athleteId))+"</td></tr>"):"")
+    +"<tr><td>"+esc(r.discipline)+'<div class="dt">'+LA.fmtDate(r.date)+" · "+venueTxt(r.venue)+(r.wind!=null?" · "+fmtWind(r.wind):"")+'</div></td><td class="m">'+esc(r.mark)+" "+unit(r)+"</td></tr>"
   ).join("");
 
   const {pb,sb}=badgeSets();
@@ -324,10 +348,11 @@ function renderList(){
     if(y!==year){year=y; html+='<div class="yearhead"><span>'+y+"</span><span>"+perYear[y]+"</span></div>";}
     const bits=[];
     if(r.wind!=null) bits.push('<span class="'+(windy(r)?"wa":"")+'">Wind '+fmtWind(r.wind)+(windy(r)?" (w)":"")+"</span>");
+    if(r.hand) bits.push("handgestoppt");
     if(r.place) bits.push("Platz "+r.place);
     if(pb.has(r.id)) bits.push('<span class="badge pb">PB</span>'); else if(sb.has(r.id)) bits.push('<span class="badge">SB</span>');
     html+='<button class="res" data-id="'+esc(r.id)+'">'
-      +'<div class="top"><span class="date">'+LA.fmtDate(r.date)+'</span><span class="badge '+(r.venue==="indoor"?"indoor":"outdoor")+'">'+venueTxt(r.venue)+"</span>"
+      +'<div class="top">'+(single?"":'<span class="who">'+esc(aName(r.athleteId))+"</span>")+'<span class="date">'+LA.fmtDate(r.date)+'</span><span class="badge '+(r.venue==="indoor"?"indoor":"outdoor")+'">'+venueTxt(r.venue)+"</span>"
       +(isChamp(r)?'<span class="badge champ">'+esc(r.champ)+"</span>":"")+"</div>"
       +'<div class="mid"><span class="disc">'+esc(r.discipline)+'</span><span class="mark">'+esc(r.mark)+(unit(r)?"<small>"+unit(r)+"</small>":"")+"</span></div>"
       +(bits.length?'<div class="bot">'+bits.join('<span class="sep">·</span>')+"</div>":"")
@@ -341,20 +366,35 @@ function renderList(){
 
   const s=LA.backupStatus();
   $("bkBanner").hidden=R.length===0||s.upToDate;
+
+  // Ergebnisse ohne Athlet (z. B. vor Version 2.1 erfasst) gesammelt zuordnen
+  const none=R.filter(r=>!r.athleteId).length;
+  $("unBox").hidden=!(none&&ATH.length);
+  if(none&&ATH.length){
+    $("unTxt").textContent=LA.plural(none,"Ergebnis ist","Ergebnisse sind")+" noch keinem Athleten zugeordnet.";
+    $("unAth").innerHTML=ATH.map(a=>opt(a.id,a.name,"")).join("");
+  }
 }
-["fYear","fDisc","fChamp","fVenue"].forEach(id=>$(id).addEventListener("change",()=>{
-  F={year:$("fYear").value,disc:$("fDisc").value,champ:$("fChamp").value,venue:$("fVenue").value};
+$("unGo").addEventListener("click",()=>{
+  const id=$("unAth").value, n=R.filter(r=>!r.athleteId).length;
+  if(!id||!confirm(LA.plural(n,"Ergebnis","Ergebnisse")+" "+LA.athleteName(id,ATH)+" zuordnen?")) return;
+  const now=new Date().toISOString();
+  R.forEach(r=>{ if(!r.athleteId){ r.athleteId=id; r.updatedAt=now; } });
+  persist(); renderList();
+});
+["fAth","fYear","fDisc","fChamp","fVenue"].forEach(id=>$(id).addEventListener("change",()=>{
+  F={ath:$("fAth").value,year:$("fYear").value,disc:$("fDisc").value,champ:$("fChamp").value,venue:$("fVenue").value};
   LA.save(FKEY,F); renderList();
 }));
-$("fReset").addEventListener("click",()=>{F={year:"",disc:"",champ:"",venue:""}; LA.save(FKEY,F); renderList();});
+$("fReset").addEventListener("click",()=>{F={ath:"",year:"",disc:"",champ:"",venue:""}; LA.save(FKEY,F); renderList();});
 $("list").addEventListener("click",e=>{const b=e.target.closest(".res"); if(b) go("#bearbeiten/"+b.dataset.id);});
 $("bkBtn").addEventListener("click",async()=>{const r=await LA.exportBackup(); if(r.res!=="aborted") renderList();});
 
 /* ---------- CSV ---------- */
 $("csv").addEventListener("click",async()=>{
   const q=v=>{const s=String(v==null?"":v); return /[;"\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
-  const rows=[["Datum","Disziplin","Halle/Freiluft","Ergebnis","Einheit","Wind","Meisterschaft","Platz","Kommentar"]];
-  filtered().forEach(r=>rows.push([LA.fmtDate(r.date),r.discipline,venueTxt(r.venue),r.mark,unit(r),
+  const rows=[["Athlet","Datum","Disziplin","Halle/Freiluft","Ergebnis","Einheit","Handzeit","Wind","Meisterschaft","Platz","Kommentar"]];
+  filtered().forEach(r=>rows.push([r.athleteId?aName(r.athleteId):"",LA.fmtDate(r.date),r.discipline,venueTxt(r.venue),r.mark,unit(r),r.hand?"ja":"",
     r.wind!=null?fmtWind(r.wind).replace("−","-"):"",r.champ||"",r.place||"",r.comment||""]));
   const csv="﻿"+rows.map(r=>r.map(q).join(";")).join("\r\n");
   const name="wettkampfergebnisse-"+new Date().toISOString().slice(0,10)+".csv";
@@ -390,6 +430,7 @@ function syncForm(){
   $("iMark").placeholder=k==="t"?"z. B. 11,42":k==="d"?"z. B. 6,45":"z. B. 5432";
   $("iMarkHint").textContent=(k==="t"?"Längere Zeiten mit Doppelpunkt, z. B. 1:58,32. ":"")+"Ohne gültiges Ergebnis: DNF, DNS, DQ oder o.g.V. eintragen.";
   $("windBox").hidden=!(venue==="outdoor"&&d.wind);
+  $("handBox").hidden=k!=="t";
   $("iWindSign").textContent=windSign<0?"−":"+";
   $("iWindSign").setAttribute("aria-label","Vorzeichen umschalten: "+(windSign<0?"minus":"plus"));
 }
@@ -407,6 +448,11 @@ function openForm(id){
   const last=R.slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)))[0];
   const base=r||{date:today(),discipline:last?last.discipline:"",venue:last?last.venue:"outdoor",kind:last?last.kind:"t"};
   buildDiscSelect(base.discipline);
+  const athSel=r?r.athleteId:(F.ath&&F.ath!=="__none"?F.ath:(last&&last.athleteId)||"");
+  $("iAth").innerHTML=(ATH.length?'<option value="" disabled'+(athSel&&ATH.some(a=>a.id===athSel)?"":" selected")+'>Bitte wählen</option>':'<option value="">–</option>')
+    +ATH.map(a=>opt(a.id,a.name,athSel)).join("");
+  $("iAth").disabled=!ATH.length; $("noAthHint").hidden=!!ATH.length;
+  $("iHand").checked=!!(r&&r.hand);
   $("iDiscName").value="";
   kind=base.kind||"t"; venue=base.venue||"outdoor";
   $("iDate").value=base.date;
@@ -426,6 +472,8 @@ $("iWindSign").addEventListener("click",()=>{windSign=-windSign; syncForm();});
 $("form").addEventListener("submit",e=>{
   e.preventDefault();
   const err=m=>{$("formErr").textContent=m; return false;};
+  const athleteId=$("iAth").value||null;
+  if(ATH.length&&!athleteId) return err("Athlet wählen.");
   const date=$("iDate").value;
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) return err("Datum fehlt.");
   const d=currentDisc();
@@ -437,7 +485,7 @@ $("form").addEventListener("submit",e=>{
   const pRaw=$("iPlace").value.trim().replace(/\.$/,"");
   if(pRaw&&!/^\d{1,4}$/.test(pRaw)) return err("Platzierung als Zahl, z. B. 3.");
   const now=new Date().toISOString();
-  const rec={date,discipline:d.name,kind:d.kind,venue,mark:m.mark,value:m.value,wind,
+  const rec={athleteId,date,discipline:d.name,kind:d.kind,venue,mark:m.mark,value:m.value,wind,hand:d.kind==="t"&&m.value!=null&&$("iHand").checked,
     champ:$("iChamp").value.trim(),place:pRaw?+pRaw:null,comment:$("iComment").value.trim(),updatedAt:now};
   if(editId){ Object.assign(R.find(x=>x.id===editId),rec); }
   else R.push(Object.assign({id:"r"+Date.now().toString(36)+Math.random().toString(36).slice(2,7),createdAt:now},rec));
@@ -476,7 +524,7 @@ function route(){
   }
 }
 window.addEventListener("hashchange",route);
-window.addEventListener("pageshow",e=>{ if(e.persisted){ R=LA.load(LA.KEYS.results,[])||[]; route(); } });
+window.addEventListener("pageshow",e=>{ if(e.persisted){ R=LA.results(); ATH=LA.athletes(); route(); } });
 
 $("ver").textContent=LA.VERSION;
 route();

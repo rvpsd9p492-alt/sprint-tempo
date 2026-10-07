@@ -1,14 +1,130 @@
-/* Gemeinsame Funktionen aller Leichtathletik-Module: Speicher, Datensicherung, Offline. */
+/* Gemeinsame Funktionen aller Leichtathletik-Module: Athleten, Ergebnisse, Bestzeiten, Sicherung, Offline. */
 (function () {
   "use strict";
-  const KEYS = { tempo: "sprintTempo.v1", results: "laResults.v1", meta: "laMeta.v1" };
+  const KEYS = { athletes: "laAthletes.v1", tempo: "sprintTempo.v1", results: "laResults.v1", meta: "laMeta.v1" };
   const TEMPO_SETTINGS = ["rt", "hochPen", "handStd", "handFly", "kExt", "tol"];
+  /** Sprintstrecken, deren Bestzeiten Sprint-Tempo nutzt (Schlüssel = Strecke in m). */
+  const SPRINT = { "60": "60 m", "100": "100 m", "200": "200 m", "400": "400 m" };
+  const SPRINT_DISTS = Object.keys(SPRINT);
+  const PB_MONTHS = 18;
 
   function load(key, def) {
     try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : def; } catch (e) { return def; }
   }
   function save(key, val) {
     try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch (e) { return false; }
+  }
+  const newId = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+  /* ---------- Athleten ---------- */
+  // { id, name, birthYear|null, manual: { "60": { v, over }, ... }, updatedAt }
+  //   manual[d].over = false: Ersatzwert (es gab kein Ergebnis) – wird von Ergebnissen abgelöst
+  //   manual[d].over = true:  bewusste Überschreibung eines erfassten Ergebnisses
+  function cleanAthlete(a) {
+    if (!a || typeof a.id !== "string" || typeof a.name !== "string") return null;
+    const manual = {};
+    SPRINT_DISTS.forEach((d) => {
+      const m = a.manual && a.manual[d];
+      if (m && typeof m.v === "number" && m.v > 0) manual[d] = { v: m.v, over: !!m.over };
+    });
+    return { id: a.id, name: a.name.slice(0, 40), birthYear: Number.isInteger(a.birthYear) ? a.birthYear : null,
+      manual, updatedAt: a.updatedAt || new Date().toISOString() };
+  }
+  /** Athlet aus dem alten Sprint-Tempo-Format (pb60 … pb400) in das zentrale Format bringen. */
+  function fromTempoAthlete(a) {
+    if (!a || typeof a.id !== "string" || typeof a.name !== "string") return null;
+    const manual = {};
+    SPRINT_DISTS.forEach((d) => { const v = a["pb" + d]; if (typeof v === "number" && v > 0) manual[d] = { v, over: false }; });
+    return cleanAthlete({ id: a.id, name: a.name, birthYear: null, manual });
+  }
+  function migrate() {
+    if (localStorage.getItem(KEYS.athletes) !== null) return;
+    const t = load(KEYS.tempo, {}) || {};
+    const list = (Array.isArray(t.athletes) ? t.athletes : []).map(fromTempoAthlete).filter(Boolean);
+    save(KEYS.athletes, list);
+  }
+  function athletes() {
+    const list = load(KEYS.athletes, []);
+    return (Array.isArray(list) ? list : []).map(cleanAthlete).filter(Boolean)
+      .sort((a, b) => a.name.localeCompare(b.name, "de"));
+  }
+  function saveAthletes(list) { return save(KEYS.athletes, list.map(cleanAthlete).filter(Boolean)); }
+  function upsertAthlete(a) {
+    const list = athletes(), i = list.findIndex((x) => x.id === a.id);
+    a.updatedAt = new Date().toISOString();
+    if (i >= 0) list[i] = a; else list.push(a);
+    return saveAthletes(list);
+  }
+  function deleteAthlete(id) {
+    saveAthletes(athletes().filter((a) => a.id !== id));
+    const res = results();
+    let changed = false;
+    res.forEach((r) => { if (r.athleteId === id) { r.athleteId = null; r.updatedAt = new Date().toISOString(); changed = true; } });
+    if (changed) saveResults(res);
+  }
+  const athleteName = (id, list) => { const a = (list || athletes()).find((x) => x.id === id); return a ? a.name : ""; };
+
+  /* ---------- Ergebnisse ---------- */
+  function results() { const r = load(KEYS.results, []); return Array.isArray(r) ? r : []; }
+  function saveResults(list) { return save(KEYS.results, list); }
+  const isWindy = (r) => r.wind != null && r.wind > 2.0;
+  /** Gültig für Bestleistungen: Ergebnis vorhanden, kein Rückenwind > 2,0, nicht handgestoppt. */
+  const isLegal = (r) => r.value != null && !isWindy(r) && !r.hand;
+
+  /* ---------- Bestzeiten für Sprint-Tempo ---------- */
+  function cutoffDate(now) {
+    const d = new Date(now || Date.now());
+    d.setMonth(d.getMonth() - PB_MONTHS);
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  /** Beste gültige Zeit je Sprintstrecke der letzten 18 Monate: { "60": Ergebnis, ... }. */
+  function autoPBs(athleteId, resList, now) {
+    const cut = cutoffDate(now), best = {};
+    (resList || results()).forEach((r) => {
+      if (r.athleteId !== athleteId || !isLegal(r) || String(r.date) < cut) return;
+      const d = SPRINT_DISTS.find((k) => SPRINT[k] === r.discipline);
+      if (!d) return;
+      const b = best[d];
+      if (!b || r.value < b.value || (r.value === b.value && r.date < b.date)) best[d] = r;
+    });
+    return best;
+  }
+  /**
+   * Wirksame Werte je Strecke: { "60": { v, src: "auto"|"manual"|"override"|null, auto, manual }, ... }
+   * auto = Ergebnis-Datensatz oder null, manual = { v, over } oder null.
+   */
+  function effectivePBs(athlete, resList, now) {
+    const auto = autoPBs(athlete.id, resList, now), out = {};
+    SPRINT_DISTS.forEach((d) => {
+      const a = auto[d] || null, m = (athlete.manual || {})[d] || null;
+      let v = null, src = null;
+      if (m && (m.over || !a)) { v = m.v; src = a ? "override" : "manual"; }
+      else if (a) { v = a.value; src = "auto"; }
+      out[d] = { v, src, auto: a, manual: m };
+    });
+    return out;
+  }
+  /** Übernimmt Eingaben aus dem Formular: leer = kein manueller Wert, gleich dem Ergebnis = kein manueller Wert. */
+  function setManual(athlete, values, resList) {
+    const auto = autoPBs(athlete.id, resList);
+    const manual = {};
+    SPRINT_DISTS.forEach((d) => {
+      const v = values[d];
+      if (v == null) return;
+      const a = auto[d];
+      if (a && Math.abs(a.value - v) < 0.005) return;
+      manual[d] = { v, over: !!a };
+    });
+    athlete.manual = manual;
+    return athlete;
+  }
+  /** Entfernt alle manuellen Werte, für die ein erfasstes Ergebnis existiert. */
+  function resetToRecorded(athlete, resList) {
+    const auto = autoPBs(athlete.id, resList);
+    const manual = {};
+    Object.keys(athlete.manual || {}).forEach((d) => { if (!auto[d]) manual[d] = athlete.manual[d]; });
+    athlete.manual = manual;
+    return athlete;
   }
 
   /* ---------- Datensicherung ---------- */
@@ -17,18 +133,17 @@
     for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); }
     return (h >>> 0).toString(16);
   }
-  function fingerprint() {
-    const t = load(KEYS.tempo, {}) || {};
-    const set = {}; TEMPO_SETTINGS.forEach((k) => (set[k] = t[k]));
-    return hash(JSON.stringify({ a: t.athletes || [], s: set, r: load(KEYS.results, []) }));
+  function tempoSettings() {
+    const t = load(KEYS.tempo, {}) || {}, set = {};
+    TEMPO_SETTINGS.forEach((k) => { if (typeof t[k] === "number") set[k] = t[k]; });
+    return set;
   }
-  function counts() {
-    const t = load(KEYS.tempo, {}) || {};
-    return { athletes: (t.athletes || []).length, results: (load(KEYS.results, []) || []).length };
+  function fingerprint() {
+    return hash(JSON.stringify({ a: load(KEYS.athletes, []), s: tempoSettings(), r: load(KEYS.results, []) }));
   }
   function backupStatus() {
     const m = load(KEYS.meta, {}) || {};
-    const c = counts();
+    const c = { athletes: athletes().length, results: results().length };
     return { empty: c.athletes + c.results === 0, upToDate: m.lastFp === fingerprint(), lastAt: m.lastAt || null, ...c };
   }
   function markBackedUp() {
@@ -54,59 +169,56 @@
   }
 
   async function exportBackup() {
-    const data = { app: "leichtathletik", v: 1, exported: new Date().toISOString(),
-      tempo: load(KEYS.tempo, null), results: load(KEYS.results, []) };
+    const data = { app: "leichtathletik", v: 2, exported: new Date().toISOString(),
+      athletes: athletes(), tempoSettings: tempoSettings(), results: results() };
     const name = "leichtathletik-sicherung-" + new Date().toISOString().slice(0, 10) + ".json";
     const res = await shareOrDownload(name, "application/json", JSON.stringify(data, null, 2));
     if (res !== "aborted") markBackedUp();
     return { res, name };
   }
 
-  /* Liest eine Sicherungsdatei (neues Format oder alte Sprint-Tempo-Sicherung). */
+  /* Liest eine Sicherungsdatei (v2, v1 oder alte Sprint-Tempo-Sicherung) in ein einheitliches Format. */
   function parseBackup(text) {
     const d = JSON.parse(text);
-    if (d && d.app === "leichtathletik") {
-      return { tempo: d.tempo && typeof d.tempo === "object" ? d.tempo : null, results: Array.isArray(d.results) ? d.results : [] };
-    }
-    if (d && d.app === "sprint-tempo" && d.state && Array.isArray(d.state.athletes)) {
-      return { tempo: d.state, results: [] };
-    }
-    throw new Error("format");
+    const out = { athletes: [], tempoSettings: {}, results: [] };
+    const pickSettings = (src) => { TEMPO_SETTINGS.forEach((k) => { if (src && typeof src[k] === "number") out.tempoSettings[k] = src[k]; }); };
+    if (d && d.app === "leichtathletik" && d.v >= 2) {
+      out.athletes = (Array.isArray(d.athletes) ? d.athletes : []).map(cleanAthlete).filter(Boolean);
+      pickSettings(d.tempoSettings);
+      out.results = Array.isArray(d.results) ? d.results : [];
+    } else if (d && d.app === "leichtathletik") {
+      const t = d.tempo || {};
+      out.athletes = (Array.isArray(t.athletes) ? t.athletes : []).map(fromTempoAthlete).filter(Boolean);
+      pickSettings(t);
+      out.results = Array.isArray(d.results) ? d.results : [];
+    } else if (d && d.app === "sprint-tempo" && d.state && Array.isArray(d.state.athletes)) {
+      out.athletes = d.state.athletes.map(fromTempoAthlete).filter(Boolean);
+      pickSettings(d.state);
+    } else throw new Error("format");
+    return out;
   }
 
-  function mergeById(current, incoming, newer) {
+  function mergeById(current, incoming) {
     const map = new Map(current.map((x) => [x.id, x]));
     let added = 0, updated = 0;
     incoming.forEach((x) => {
       if (!x || typeof x.id !== "string") return;
       const old = map.get(x.id);
       if (!old) { map.set(x.id, x); added++; }
-      else if (newer(x, old)) { map.set(x.id, x); updated++; }
+      else if (String(x.updatedAt || "") >= String(old.updatedAt || "")) { map.set(x.id, x); updated++; }
     });
     return { list: [...map.values()], added, updated };
   }
 
   /* Übernimmt eine Sicherung: Einträge werden zusammengeführt, nichts Vorhandenes gelöscht. */
   function applyBackup(b) {
-    let athletes = 0, results = 0;
-    if (b.tempo && Array.isArray(b.tempo.athletes)) {
-      const cur = load(KEYS.tempo, {}) || {};
-      const m = mergeById(Array.isArray(cur.athletes) ? cur.athletes : [], b.tempo.athletes, () => true);
-      const next = Object.assign({}, cur);
-      TEMPO_SETTINGS.forEach((k) => { if (typeof b.tempo[k] === "number") next[k] = b.tempo[k]; });
-      next.athletes = m.list;
-      if (!next.cur && m.list[0]) next.cur = m.list[0].id;
-      save(KEYS.tempo, next);
-      athletes = m.added + m.updated;
-    }
-    if (b.results.length) {
-      const m = mergeById(load(KEYS.results, []) || [], b.results,
-        (x, old) => String(x.updatedAt || "") >= String(old.updatedAt || ""));
-      save(KEYS.results, m.list);
-      results = m.added + m.updated;
-    }
+    const ma = mergeById(athletes(), b.athletes);
+    saveAthletes(ma.list);
+    if (Object.keys(b.tempoSettings).length) save(KEYS.tempo, Object.assign(load(KEYS.tempo, {}) || {}, b.tempoSettings));
+    const mr = mergeById(results(), b.results);
+    saveResults(mr.list);
     markBackedUp();
-    return { athletes, results };
+    return { athletes: ma.added + ma.updated, results: mr.added + mr.updated };
   }
 
   /* ---------- Formatierung ---------- */
@@ -115,7 +227,9 @@
     const [y, m, d] = String(iso).slice(0, 10).split("-");
     return d + "." + m + "." + y;
   }
+  const fmtTime = (t) => (t == null || !isFinite(t) ? "–" : t.toFixed(2).replace(".", ","));
   const esc = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const plural = (n, one, many) => n + " " + (n === 1 ? one : many);
 
   /* ---------- Offline ---------- */
   function registerOffline(root, onState) {
@@ -128,6 +242,12 @@
     }).catch(() => set("Offline-Modus nicht verfügbar"));
   }
 
-  window.LA = { KEYS, load, save, backupStatus, exportBackup, parseBackup, applyBackup, shareOrDownload,
-    fmtDate, esc, registerOffline, VERSION: "2.0" };
+  migrate();
+
+  window.LA = { KEYS, SPRINT, SPRINT_DISTS, PB_MONTHS, load, save, newId,
+    athletes, saveAthletes, upsertAthlete, deleteAthlete, athleteName,
+    results, saveResults, isWindy, isLegal,
+    autoPBs, effectivePBs, setManual, resetToRecorded,
+    backupStatus, exportBackup, parseBackup, applyBackup, shareOrDownload,
+    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.1" };
 })();

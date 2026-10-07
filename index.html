@@ -49,6 +49,17 @@
   </div>
 
   <nav class="tiles" aria-label="Module">
+    <a class="tile" href="athleten/">
+      <span class="ic" aria-hidden="true" style="background:var(--ink)">
+        <svg viewBox="0 0 32 32" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><circle cx="12" cy="10" r="4.5"/><path d="M4 27c0-5 3.6-8 8-8s8 3 8 8"/><circle cx="23" cy="11" r="3.5" stroke="#F2C230"/><path d="M22 19c4 0 7 2.5 7 7" stroke="#F2C230"/></svg>
+      </span>
+      <span class="tx">
+        <h2>Athleten</h2>
+        <span class="d">Zentrale Verwaltung für alle Module</span>
+        <span class="st" id="stAth"></span>
+      </span>
+      <span class="go" aria-hidden="true">›</span>
+    </a>
     <a class="tile" href="tempo/">
       <span class="ic" aria-hidden="true">
         <svg viewBox="0 0 32 32" fill="none" stroke="#F2C230" stroke-width="3" stroke-linecap="round"><circle cx="17" cy="18" r="10"/><path d="M17 18l5-6M14 4h6"/><path d="M3 14h5M2 19h5M4 24h5" stroke="#fff"/></svg>
@@ -99,8 +110,9 @@ const $=id=>document.getElementById(id);
 $("ver").textContent=LA.VERSION;
 
 function render(){
-  const t=LA.load(LA.KEYS.tempo,{})||{}, ath=(t.athletes||[]).length;
-  $("stTempo").textContent=ath?ath+" Athlet"+(ath===1?"":"en"):"";
+  const ath=LA.athletes().length;
+  $("stAth").textContent=ath?LA.plural(ath,"Athlet","Athleten"):"Noch keine Athleten angelegt";
+  $("stTempo").textContent="";
   const res=LA.load(LA.KEYS.results,[])||[];
   if(res.length){
     const last=res.map(r=>r.date).sort().pop();

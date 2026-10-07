@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Athleten</title>
+<meta name="description" content="Zentrale Athletenverwaltung für alle Leichtathletik-Module.">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Leichtathletik">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#E9EEF2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1824" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+.ath{display:block;width:100%;text-align:left;background:var(--surface);border:0;border-radius:14px;padding:14px 16px;margin-bottom:8px;color:var(--ink);font:inherit;cursor:pointer}
+.ath .nm{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.ath .nm b{font:600 21px "Barlow Condensed",sans-serif}
+.ath .nm span{font-size:14px;color:var(--muted)}
+.ath .pb{font-size:14px;margin-top:4px;font-variant-numeric:tabular-nums}
+.ath .pb .x{color:var(--muted)}
+.empty{text-align:center;color:var(--muted);padding:28px 10px}
+.err{color:var(--warn);font-size:14px;font-weight:600;margin:8px 0 0}
+</style>
+</head>
+<body>
+<main>
+<div id="viewList">
+  <a class="back" href="../">Übersicht</a>
+  <h1>Athleten</h1>
+  <p class="sub">Zentral für alle Module: Sprint-Tempo und Wettkampfergebnisse.</p>
+  <div id="list"></div>
+  <a class="btn primary block" href="#neu" id="addBtn">+ Athlet anlegen</a>
+  <p class="note" style="text-align:center">Sprint-Bestzeiten werden aus den Wettkampfergebnissen der letzten 18 Monate übernommen und in Sprint-Tempo bei Bedarf überschrieben.</p>
+</div>
+
+<div id="viewForm" hidden>
+  <a class="back" href="#" id="cancelTop">Abbrechen</a>
+  <h1 id="formHead">Athlet anlegen</h1>
+  <form id="form" novalidate autocomplete="off">
+    <section>
+      <label class="fl" for="iName" style="margin-top:0">Name</label>
+      <input type="text" id="iName" maxlength="40" required>
+      <div class="grid2">
+        <div>
+          <label class="fl" for="iYear">Jahrgang (optional)</label>
+          <input type="text" id="iYear" inputmode="numeric" maxlength="4" placeholder="z. B. 2008">
+        </div>
+        <div></div>
+      </div>
+      <p class="note" id="statInfo"></p>
+    </section>
+    <p class="err" id="formErr" role="alert"></p>
+    <div class="row" style="margin-top:12px">
+      <button type="submit" class="btn primary" style="flex:1 1 auto">Speichern</button>
+      <button type="button" class="btn" id="cancel">Abbrechen</button>
+      <button type="button" class="btn danger" id="del" hidden>Löschen</button>
+    </div>
+  </form>
+</div>
+<p class="foot">Version <span id="ver"></span> · <span id="offState">Offline-Modus wird vorbereitet …</span></p>
+</main>
+<script src="../shared/common.js"></script>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id), esc=LA.esc;
+let editId=null, delTimer=null, fromList=false;
+
+function renderList(){
+  const list=LA.athletes(), res=LA.results();
+  if(!list.length){ $("list").innerHTML='<div class="empty">Noch keine Athleten angelegt.</div>'; return; }
+  $("list").innerHTML=list.map(a=>{
+    const n=res.filter(r=>r.athleteId===a.id).length;
+    const pb=LA.effectivePBs(a,res);
+    const pbTxt=LA.SPRINT_DISTS.filter(d=>pb[d].v!=null).map(d=>'<span class="x">'+d+" m</span> "+LA.fmtTime(pb[d].v)).join(" · ");
+    return '<button class="ath" data-id="'+esc(a.id)+'"><div class="nm"><b>'+esc(a.name)+"</b><span>"
+      +(a.birthYear?"Jg. "+a.birthYear+" · ":"")+LA.plural(n,"Ergebnis","Ergebnisse")+"</span></div>"
+      +(pbTxt?'<div class="pb">'+pbTxt+"</div>":"")+"</button>";
+  }).join("");
+}
+$("list").addEventListener("click",e=>{const b=e.target.closest(".ath"); if(b) location.hash="#bearbeiten/"+encodeURIComponent(b.dataset.id);});
+
+function disarm(){const b=$("del"); b.dataset.armed=""; b.textContent="Löschen"; b.classList.remove("armed"); clearTimeout(delTimer);}
+function openForm(id){
+  const a=id?LA.athletes().find(x=>x.id===id):null;
+  if(id&&!a){ location.replace("#"); return; }
+  editId=a?a.id:null;
+  $("formHead").textContent=a?"Athlet bearbeiten":"Athlet anlegen";
+  $("iName").value=a?a.name:""; $("iYear").value=a&&a.birthYear?a.birthYear:"";
+  $("del").hidden=!a; disarm(); $("formErr").textContent="";
+  const n=a?LA.results().filter(r=>r.athleteId===a.id).length:0;
+  $("statInfo").textContent=a?LA.plural(n,"Wettkampfergebnis","Wettkampfergebnisse")+" erfasst.":"";
+}
+$("form").addEventListener("submit",e=>{
+  e.preventDefault();
+  const name=$("iName").value.trim(), y=$("iYear").value.trim();
+  if(!name){ $("formErr").textContent="Name fehlt."; return; }
+  const list=LA.athletes();
+  if(list.some(a=>a.id!==editId&&a.name.toLowerCase()===name.toLowerCase())){ $("formErr").textContent="Es gibt bereits einen Athleten mit diesem Namen."; return; }
+  const yr=y?+y:null, now=new Date().getFullYear();
+  if(y&&!(/^\d{4}$/.test(y)&&yr>=1920&&yr<=now)){ $("formErr").textContent="Jahrgang vierstellig, z. B. 2008."; return; }
+  const a=editId?list.find(x=>x.id===editId):{id:LA.newId("a"),manual:{}};
+  a.name=name; a.birthYear=yr;
+  if(!LA.upsertAthlete(a)){ $("formErr").textContent="Speichern fehlgeschlagen."; return; }
+  close();
+});
+$("del").addEventListener("click",()=>{
+  const b=$("del");
+  if(b.dataset.armed!=="1"){
+    const n=LA.results().filter(r=>r.athleteId===editId).length;
+    b.dataset.armed="1"; b.textContent=n?"Löschen? "+LA.plural(n,"Ergebnis bleibt","Ergebnisse bleiben")+" ohne Athlet erhalten":"Wirklich löschen?";
+    b.classList.add("armed"); delTimer=setTimeout(disarm,5000); return;
+  }
+  LA.deleteAthlete(editId); close();
+});
+// Aufruf aus einem Modul (z. B. ../athleten/?back=tempo#neu): danach dorthin zurück
+const BACK=new URLSearchParams(location.search).get("back");
+function close(){
+  if(fromList) history.back();
+  else if(BACK==="tempo"||BACK==="ergebnisse") location.replace("../"+BACK+"/");
+  else location.replace("#");
+}
+$("cancel").addEventListener("click",close);
+$("cancelTop").addEventListener("click",e=>{e.preventDefault(); close();});
+$("addBtn").addEventListener("click",e=>{e.preventDefault(); location.hash="#neu";});
+
+function route(){
+  const h=location.hash, m=h.match(/^#bearbeiten\/(.+)$/);
+  if(h==="#neu"||m){
+    if(!$("viewList").hidden) fromList=true;
+    $("viewList").hidden=true; $("viewForm").hidden=false;
+    openForm(m?decodeURIComponent(m[1]):null); window.scrollTo(0,0);
+    if(!m) $("iName").focus();
+  } else {
+    $("viewForm").hidden=true; $("viewList").hidden=false; fromList=false; renderList();
+  }
+}
+window.addEventListener("hashchange",route);
+window.addEventListener("pageshow",e=>{ if(e.persisted) route(); });
+$("ver").textContent=LA.VERSION;
+route();
+LA.registerOffline("../",s=>{$("offState").textContent=s;});
+})();
+</script>
+</body>
+</html>

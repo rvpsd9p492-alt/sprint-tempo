@@ -114,7 +114,17 @@ details .in{padding:0 16px 16px}
 .btn.primary{background:var(--track);border-color:var(--track);color:var(--track-ink)}
 .btn.danger{color:var(--warn);margin-left:auto}
 .btn.danger.armed{background:var(--warn);border-color:var(--warn);color:#fff}
-#athEdit{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+#pbEdit{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.pbt{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.pbt td{padding:7px 0;border-bottom:1px solid var(--line);vertical-align:baseline}
+.pbt tr:last-child td{border-bottom:0}
+.pbt .d{font-weight:600;width:62px;white-space:nowrap}
+.pbt .v{font:700 20px "Barlow Condensed",sans-serif;text-align:right;white-space:nowrap;padding-left:8px}
+.pbt .s{font-size:13px;color:var(--muted)}
+.src{display:inline-block;font:600 12px "Barlow",sans-serif;padding:1px 6px;border-radius:5px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.src.ov{background:var(--signal);border-color:var(--signal);color:var(--signal-ink)}
+.src.miss{border-color:var(--warn);color:var(--warn)}
+.hintv{display:block;font-size:12px;color:var(--muted);margin-top:3px}
 .err{background:var(--warn);color:#fff;border-radius:10px;padding:10px 12px;margin-bottom:12px}
 .foot{font-size:13px;color:var(--muted);text-align:center;margin-top:16px}
 .back{display:inline-flex;align-items:center;gap:2px;color:var(--link);font:600 16px "Barlow",sans-serif;text-decoration:none;padding:6px 0;min-height:44px}
@@ -130,28 +140,34 @@ details .in{padding:0 16px 16px}
 
   <div class="err" id="err" hidden></div>
   <section aria-label="Athlet" id="athBox">
-    <div class="lbl">Athlet</div>
-    <div class="chips" id="athChips"></div>
-    <div class="athinfo" id="athInfo">
-      <span id="athPB"></span>
-      <button class="link" id="athEditBtn">Bearbeiten</button>
+    <div class="row" style="justify-content:space-between"><div class="lbl" style="margin:0">Athlet</div><a class="link" href="../athleten/?back=tempo">Athleten verwalten</a></div>
+    <div class="chips" id="athChips" style="margin-top:6px"></div>
+    <div id="noAth" hidden>
+      <p class="note" style="margin-top:0">Noch keine Athleten angelegt. Athleten werden zentral verwaltet und gelten für alle Module.</p>
+      <a class="btn primary" href="../athleten/?back=tempo#neu" style="margin-top:10px">Athlet anlegen</a>
     </div>
-    <div id="athEdit" hidden>
-      <h2 id="athEditHead">Athlet anlegen</h2>
-      <label class="fl" for="aName">Name</label>
-      <input type="text" id="aName" maxlength="40" autocomplete="off">
-      <div class="grid3" style="margin-top:10px">
-        <div><label for="a60">60 m (s)</label><input type="text" id="a60" inputmode="decimal" autocomplete="off"></div>
-        <div><label for="a100">100 m (s)</label><input type="text" id="a100" inputmode="decimal" autocomplete="off"></div>
-        <div><label for="a200">200 m (s)</label><input type="text" id="a200" inputmode="decimal" autocomplete="off"></div>
-        <div><label for="a400">400 m (optional)</label><input type="text" id="a400" inputmode="decimal" placeholder="leer" autocomplete="off"></div>
-      </div>
-      <p class="note">Elektronisch gemessene Wettkampfzeiten der aktuellen Saison.</p>
-      <p class="note warn" id="aMsg"></p>
+    <div id="pbBox" hidden>
+      <div class="lbl">Bestzeiten für die Berechnung</div>
+      <table class="pbt" id="pbTable"></table>
       <div class="row" style="margin-top:10px">
-        <button class="btn primary" id="aSave">Speichern</button>
-        <button class="btn" id="aCancel">Abbrechen</button>
-        <button class="btn danger" id="aDel">Löschen</button>
+        <button class="btn" id="pbEditBtn">Werte überschreiben</button>
+        <button class="btn" id="pbResetBtn" hidden>Zurücksetzen auf erfasste Bestzeiten</button>
+      </div>
+      <p class="note">Automatisch übernommen: beste elektronische Zeiten der letzten 18 Monate aus den <a class="link" style="font-size:14px;padding:0" href="../ergebnisse/">Wettkampfergebnissen</a> (ohne Rückenwind über +2,0 m/s, ohne Handzeiten). Ohne Ergebnis: manuell eintragen.</p>
+    </div>
+    <div id="pbEdit" hidden>
+      <h2>Bestzeiten überschreiben</h2>
+      <p class="note" style="margin-top:0">Elektronisch gemessene Wettkampfzeiten. Feld leer lassen = Wert aus den Wettkampfergebnissen verwenden.</p>
+      <div class="grid3" style="margin-top:10px">
+        <div><label for="p60">60 m (s)</label><input type="text" id="p60" inputmode="decimal" autocomplete="off"><span class="hintv" id="h60"></span></div>
+        <div><label for="p100">100 m (s)</label><input type="text" id="p100" inputmode="decimal" autocomplete="off"><span class="hintv" id="h100"></span></div>
+        <div><label for="p200">200 m (s)</label><input type="text" id="p200" inputmode="decimal" autocomplete="off"><span class="hintv" id="h200"></span></div>
+        <div><label for="p400">400 m (optional)</label><input type="text" id="p400" inputmode="decimal" autocomplete="off"><span class="hintv" id="h400"></span></div>
+      </div>
+      <p class="note warn" id="pMsg"></p>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="pSave">Speichern</button>
+        <button class="btn" id="pCancel">Abbrechen</button>
       </div>
     </div>
   </section>
@@ -243,26 +259,31 @@ details .in{padding:0 16px 16px}
 const DISTS=[30,40,50,60,80,100,120,150,200,250,300];
 const PCTS=[70,75,80,85,90,95,100];
 const STORE="sprintTempo.v1";
-const DEF={athletes:[],cur:null,rt:0.16,hochPen:0.10,handStd:0.15,handFly:0.00,kExt:1.10,tol:0.10,
+const DEF={cur:null,rt:0.16,hochPen:0.10,handStd:0.15,handFly:0.00,kExt:1.10,tol:0.10,
   dist:150,start:"hoch",timing:"hand",runin:20,pct:80};
 const SETKEYS=["rt","hochPen","handStd","handFly","kExt","tol"];
-const KEYS=["athletes","cur",...SETKEYS,"dist","start","timing","runin","pct"];
+const KEYS=["cur",...SETKEYS,"dist","start","timing","runin","pct"];
+let ATH=LA.athletes(), RES=LA.results();
 let S=Object.assign({},DEF);
 try{const raw=localStorage.getItem(STORE); if(raw) Object.assign(S,JSON.parse(raw));}catch(e){}
+delete S.athletes; // seit Version 2.1 zentral in der Athletenverwaltung
 sanitize();
 
 function sanitize(){
-  if(!Array.isArray(S.athletes)) S.athletes=[];
-  S.athletes=S.athletes.filter(a=>a&&typeof a.id==="string"&&typeof a.name==="string"&&a.pb60>0&&a.pb100>0&&a.pb200>0);
   SETKEYS.forEach(k=>{if(typeof S[k]!=="number"||!isFinite(S[k])) S[k]=DEF[k];});
   if(!["block","hoch","fly"].includes(S.start)) S.start=DEF.start;
   if(!["hand","elec","race"].includes(S.timing)) S.timing=DEF.timing;
   if(!(S.dist>=20&&S.dist<=400)) S.dist=DEF.dist;
   if(!(S.runin>=5&&S.runin<=60)) S.runin=DEF.runin;
   if(!(S.pct>=60&&S.pct<=100)) S.pct=DEF.pct;
-  if(!S.athletes.find(a=>a.id===S.cur)) S.cur=S.athletes[0]?S.athletes[0].id:null;
+  if(!ATH.find(a=>a.id===S.cur)) S.cur=ATH[0]?ATH[0].id:null;
 }
-const curAth=()=>S.athletes.find(a=>a.id===S.cur)||null;
+/* Athleten kommen aus der zentralen Verwaltung, Bestzeiten aus den Wettkampfergebnissen (oder manuell). */
+function curAth(){
+  const a=ATH.find(x=>x.id===S.cur); if(!a) return null;
+  const eff=LA.effectivePBs(a,RES);
+  return {a,name:a.name,eff,pb60:eff["60"].v,pb100:eff["100"].v,pb200:eff["200"].v,pb400:eff["400"].v};
+}
 const snap=()=>{const o={};KEYS.forEach(k=>{if(S[k]!==undefined)o[k]=S[k];});return o;};
 function save(){try{localStorage.setItem(STORE,JSON.stringify(snap()));}catch(e){}}
 
@@ -276,7 +297,9 @@ const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",
 let M=null;
 function fitModel(){
   const P=curAth();
-  if(!P) return {error:"Leg zuerst einen Athleten mit seinen Bestzeiten an.",empty:true};
+  if(!P) return {error:"Leg zuerst einen Athleten an.",empty:true};
+  const miss=["60","100","200"].filter(d=>P["pb"+d]==null);
+  if(miss.length) return {error:"Für "+P.name+" fehlen Bestzeiten über "+miss.join(", ")+" m – in den Wettkampfergebnissen der letzten 18 Monate gibt es keine. Bitte unten eintragen.",missing:true};
   const RT=S.rt, T60=P.pb60-RT, T100=P.pb100-RT, T200=P.pb200-RT;
   if(!(T60>0&&T100>T60&&T200>T100)) return {error:"Bestzeiten unplausibel: 60 m < 100 m < 200 m nötig."};
   const AB=(t,tau)=>{const g=t-tau*(1-Math.exp(-t/tau));return [tau*g, tau*tau*g - tau*t*t/2];};
@@ -343,7 +366,7 @@ function render(){
   const err=$("err");
   if(M.error){
     err.textContent=M.error; err.hidden=!!M.empty; $("calc").hidden=true;
-    if(M.empty&&$("athEdit").hidden) openEdit(null);
+    if(M.missing&&$("pbEdit").hidden) openPB();
     M=null; save(); return;
   }
   err.hidden=true; $("calc").hidden=false;
@@ -397,59 +420,67 @@ function render(){
   save();
 }
 
-/* ---------- Athleten ---------- */
-let editId=null, delTimer=null;
-function disarmDel(){const b=$("aDel"); b.dataset.armed=""; b.textContent="Löschen"; b.classList.remove("armed"); clearTimeout(delTimer);}
-const dec=v=>v==null?"":String(v).replace(".",",");
+/* ---------- Athleten & Bestzeiten ---------- */
+const DISTS4=LA.SPRINT_DISTS;
+const PB_RANGE={"60":[5,15],"100":[8,25],"200":[16,50],"400":[35,120]};
+const dec=v=>v==null?"":v.toFixed(2).replace(".",",");
+function srcInfo(e,d){
+  if(e.src==="auto") return '<span class="s">'+LA.fmtDate(e.auto.date)+" · "+(e.auto.venue==="indoor"?"Halle":"Freiluft")+(e.auto.wind!=null?" · Wind "+(e.auto.wind<0?"−":"+")+Math.abs(e.auto.wind).toFixed(1).replace(".",","):"")+"</span>";
+  if(e.src==="override") return '<span class="src ov">manuell überschrieben</span> <span class="s">Ergebnis: '+fmt(e.auto.value)+"</span>";
+  if(e.src==="manual") return '<span class="src">manuell</span>';
+  return d==="400"?'<span class="s">optional – nicht vorhanden</span>':'<span class="src miss">fehlt</span>';
+}
 function renderAth(){
-  $("athChips").innerHTML=S.athletes.map(a=>'<button data-id="'+esc(a.id)+'" aria-pressed="'+(a.id===S.cur)+'">'+esc(a.name)+'</button>').join("")
-    +'<button class="add" data-id="__new">+ Neu</button>';
-  const a=curAth();
-  $("athInfo").hidden=!a;
-  if(a) $("athPB").textContent="60 m "+fmt(a.pb60)+" · 100 m "+fmt(a.pb100)+" · 200 m "+fmt(a.pb200)+(a.pb400?" · 400 m "+fmt(a.pb400):"");
+  $("athChips").innerHTML=ATH.map(a=>'<button data-id="'+esc(a.id)+'" aria-pressed="'+(a.id===S.cur)+'">'+esc(a.name)+'</button>').join("")
+    +(ATH.length?'<button class="add" data-id="__new">+ Neu</button>':"");
+  $("athChips").hidden=!ATH.length;
+  $("noAth").hidden=!!ATH.length;
+  const P=curAth();
+  $("pbBox").hidden=!P||!$("pbEdit").hidden;
+  if(!P){ $("pbEdit").hidden=true; return; }
+  $("pbTable").innerHTML=DISTS4.map(d=>{const e=P.eff[d];
+    return '<tr><td class="d">'+d+' m</td><td>'+srcInfo(e,d)+'</td><td class="v">'+(e.v!=null?fmt(e.v)+" s":"–")+"</td></tr>";}).join("");
+  $("pbResetBtn").hidden=!DISTS4.some(d=>P.eff[d].src==="override");
 }
-function openEdit(id){
-  editId=id; const a=id?S.athletes.find(x=>x.id===id):null;
-  $("athEditHead").textContent=a?"Athlet bearbeiten":"Athlet anlegen";
-  $("aName").value=a?a.name:""; $("a60").value=a?dec(a.pb60):""; $("a100").value=a?dec(a.pb100):"";
-  $("a200").value=a?dec(a.pb200):""; $("a400").value=a&&a.pb400?dec(a.pb400):"";
-  disarmDel(); $("aDel").hidden=!a; $("aCancel").hidden=S.athletes.length===0; $("aMsg").textContent="";
-  $("athEdit").hidden=false;
+function openPB(){
+  const P=curAth(); if(!P) return;
+  DISTS4.forEach(d=>{const e=P.eff[d];
+    $("p"+d).value=e.src==="override"||e.src==="manual"?dec(e.v):"";
+    $("p"+d).placeholder=e.auto?dec(e.auto.value):(d==="400"?"leer":"");
+    $("h"+d).textContent=e.auto?"Ergebnis: "+fmt(e.auto.value)+" ("+LA.fmtDate(e.auto.date)+")":"kein Ergebnis in 18 Monaten";
+  });
+  $("pMsg").textContent=""; $("pbEdit").hidden=false; $("pbBox").hidden=true;
 }
-function closeEdit(){$("athEdit").hidden=true;}
+function closePB(){ $("pbEdit").hidden=true; render(); }
 $("athChips").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b) return;
-  if(b.dataset.id==="__new"){openEdit(null);$("aName").focus();return;}
-  S.cur=b.dataset.id; M=null; closeEdit(); render();
+  if(b.dataset.id==="__new"){ location.href="../athleten/?back=tempo#neu"; return; }
+  S.cur=b.dataset.id; M=null; $("pbEdit").hidden=true; render();
 });
-$("athEditBtn").addEventListener("click",()=>{openEdit(S.cur);$("aName").focus();});
-$("aCancel").addEventListener("click",closeEdit);
-$("aSave").addEventListener("click",()=>{
-  const name=$("aName").value.trim(), p60=num($("a60").value), p100=num($("a100").value), p200=num($("a200").value), p400=num($("a400").value);
-  let msg="";
-  if(!name) msg="Name fehlt.";
-  else if(!(p60>0&&p100>0&&p200>0)) msg="60, 100 und 200 m sind Pflicht.";
-  else if(!(p60<p100&&p100<p200)) msg="Zeiten unplausibel: 60 m < 100 m < 200 m.";
-  else if($("a400").value.trim()!==""&&p400===null) msg="400-m-Zeit ist keine Zahl.";
-  else if(p400!==null&&!(p400>p200)) msg="400-m-Zeit muss über der 200-m-Zeit liegen.";
-  if(msg){$("aMsg").textContent=msg;return;}
-  const rec={name,pb60:p60,pb100:p100,pb200:p200,pb400:p400};
-  const ex=editId&&S.athletes.find(x=>x.id===editId);
-  if(ex) Object.assign(ex,rec);
-  else {const id="a"+Date.now().toString(36)+Math.random().toString(36).slice(2,6); S.athletes.push(Object.assign({id},rec)); S.cur=id;}
-  M=null; closeEdit(); render();
+$("pbEditBtn").addEventListener("click",openPB);
+$("pCancel").addEventListener("click",closePB);
+$("pSave").addEventListener("click",()=>{
+  const P=curAth(); if(!P) return;
+  const vals={}; let msg="";
+  DISTS4.forEach(d=>{
+    if(msg) return;
+    const raw=$("p"+d).value.trim(); if(!raw){vals[d]=null;return;}
+    const v=num(raw), r=PB_RANGE[d];
+    if(v===null||!(v>=r[0]&&v<=r[1])) msg=d+"-m-Zeit unplausibel (erwartet "+r[0]+"–"+r[1]+" s).";
+    else vals[d]=v;
+  });
+  if(msg){$("pMsg").textContent=msg;return;}
+  const next=LA.setManual(JSON.parse(JSON.stringify(P.a)),vals,RES);
+  const eff=LA.effectivePBs(next,RES), v=d=>eff[d].v;
+  if(v("60")!=null&&v("100")!=null&&!(v("60")<v("100"))||v("100")!=null&&v("200")!=null&&!(v("100")<v("200")))
+    {$("pMsg").textContent="Zeiten unplausibel: 60 m < 100 m < 200 m nötig.";return;}
+  if(v("400")!=null&&v("200")!=null&&!(v("400")>v("200"))){$("pMsg").textContent="400-m-Zeit muss über der 200-m-Zeit liegen.";return;}
+  LA.upsertAthlete(next); ATH=LA.athletes(); M=null; closePB();
 });
-$("aDel").addEventListener("click",()=>{
-  const a=S.athletes.find(x=>x.id===editId); if(!a) return;
-  const btn=$("aDel");
-  if(btn.dataset.armed!=="1"){
-    btn.dataset.armed="1"; btn.textContent=a.name+" wirklich löschen?"; btn.classList.add("armed");
-    clearTimeout(delTimer); delTimer=setTimeout(disarmDel,4000); return;
-  }
-  disarmDel();
-  S.athletes=S.athletes.filter(x=>x.id!==editId);
-  if(S.cur===editId) S.cur=S.athletes[0]?S.athletes[0].id:null;
-  M=null; closeEdit(); render();
+$("pbResetBtn").addEventListener("click",()=>{
+  const P=curAth(); if(!P) return;
+  if(!confirm("Manuell überschriebene Werte von "+P.name+" verwerfen und die erfassten Bestzeiten aus den Wettkampfergebnissen verwenden?")) return;
+  LA.upsertAthlete(LA.resetToRecorded(JSON.parse(JSON.stringify(P.a)),RES)); ATH=LA.athletes(); M=null; render();
 });
 
 /* ---------- Start ---------- */

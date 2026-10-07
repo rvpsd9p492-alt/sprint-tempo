@@ -6,8 +6,10 @@ Offline-Web-App mit mehreren Leichtathletik-Modulen.
 
 ## Module
 
+- **Athleten** (`athleten/`) – zentrale Athletenverwaltung für alle Module.
 - **Sprint-Tempo** (`tempo/`) – Trainings-Sollzeiten aus 60/100/200-m-Bestzeiten über ein physikalisches
-  Geschwindigkeitsmodell (Hill/Keller, Tibshirani 1997).
+  Geschwindigkeitsmodell (Hill/Keller, Tibshirani 1997). Bestzeiten kommen automatisch aus den Wettkampfergebnissen
+  der letzten 18 Monate (elektronisch, Wind ≤ +2,0); fehlende Werte manuell, Überschreiben und Zurücksetzen möglich.
 - **Wettkampfergebnisse** (`ergebnisse/`) – Ergebnisse mit Datum, Disziplin, Halle/Freiluft, Ergebnis, Wind,
   Meisterschaft, Platzierung und Kommentar erfassen; Filter nach Jahr, Disziplin, Meisterschaft und Halle/Freiluft;
   Bestleistungen (PB/SB, ohne Rückenwind über +2,0 m/s); CSV-Export für Excel.
