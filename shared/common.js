@@ -84,6 +84,41 @@
   /** Gültig für Bestleistungen: Ergebnis vorhanden, kein Rückenwind > 2,0, nicht handgestoppt. */
   const isLegal = (r) => r.value != null && !isWindy(r) && !r.hand;
 
+  /* ---------- Disziplinen & Bestleistungen ---------- */
+  // [Name, Wertung (t=Zeit, d=Weite/Höhe, p=Punkte), Windmessung im Freien]
+  const DISCIPLINE_GROUPS = [
+    ["Sprint", [["50 m", "t", 1], ["60 m", "t", 1], ["75 m", "t", 1], ["100 m", "t", 1], ["150 m", "t", 0], ["200 m", "t", 1], ["300 m", "t", 0], ["400 m", "t", 0]]],
+    ["Hürden", [["60 m Hürden", "t", 1], ["80 m Hürden", "t", 1], ["100 m Hürden", "t", 1], ["110 m Hürden", "t", 1], ["300 m Hürden", "t", 0], ["400 m Hürden", "t", 0]]],
+    ["Lauf", [["800 m", "t", 0], ["1000 m", "t", 0], ["1500 m", "t", 0], ["2000 m", "t", 0], ["3000 m", "t", 0], ["5000 m", "t", 0], ["10.000 m", "t", 0],
+      ["2000 m Hindernis", "t", 0], ["3000 m Hindernis", "t", 0], ["10 km Straße", "t", 0], ["Halbmarathon", "t", 0], ["Marathon", "t", 0]]],
+    ["Staffel", [["4×100 m", "t", 0], ["4×200 m", "t", 0], ["4×400 m", "t", 0]]],
+    ["Sprung", [["Hochsprung", "d", 0], ["Stabhochsprung", "d", 0], ["Weitsprung", "d", 1], ["Dreisprung", "d", 1]]],
+    ["Wurf", [["Kugelstoß", "d", 0], ["Diskuswurf", "d", 0], ["Hammerwurf", "d", 0], ["Speerwurf", "d", 0], ["Ballwurf", "d", 0]]],
+    ["Mehrkampf", [["Dreikampf", "p", 0], ["Vierkampf", "p", 0], ["Fünfkampf", "p", 0], ["Siebenkampf", "p", 0], ["Zehnkampf", "p", 0]]],
+  ];
+  const DISC = new Map();
+  DISCIPLINE_GROUPS.forEach(([, list]) => list.forEach(([n, k, w]) => DISC.set(n, { kind: k, wind: !!w, order: DISC.size })));
+  const discOrder = (name) => (DISC.has(name) ? DISC.get(name).order : 1000);
+  const better = (kind, a, b) => (kind === "t" ? a < b : a > b);
+  /** Einheit eines Ergebnisses: s, min, h, m oder Pkt. */
+  function markUnit(r) {
+    if (r.value == null) return "";
+    if (r.kind === "d") return "m";
+    if (r.kind === "p") return "Pkt.";
+    const c = (String(r.mark).match(/:/g) || []).length;
+    return c === 2 ? "h" : c === 1 ? "min" : "s";
+  }
+  /** Je Athlet und Disziplin das beste gültige Ergebnis (bei Gleichstand das frühere). Schlüssel: "athleteId|Disziplin". */
+  function bestMarks(list) {
+    const best = new Map();
+    list.forEach((r) => {
+      if (!isLegal(r)) return;
+      const k = (r.athleteId || "") + "|" + r.discipline, b = best.get(k);
+      if (!b || better(r.kind, r.value, b.value) || (r.value === b.value && r.date < b.date)) best.set(k, r);
+    });
+    return best;
+  }
+
   /* ---------- Bestzeiten für Sprint-Tempo ---------- */
   function cutoffDate(now) {
     const d = new Date(now || Date.now());
@@ -263,7 +298,8 @@
   window.LA = { KEYS, SPRINT, SPRINT_DISTS, PB_MONTHS, load, save, newId, trackDelete, hash, tempoSettings, TEMPO_SETTINGS,
     athletes, saveAthletes, upsertAthlete, deleteAthlete, athleteName,
     results, saveResults, isWindy, isLegal,
+    DISCIPLINE_GROUPS, DISC, discOrder, better, markUnit, bestMarks,
     autoPBs, effectivePBs, setManual, resetToRecorded,
     backupStatus, exportBackup, parseBackup, applyBackup, shareOrDownload,
-    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.3" };
+    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.4" };
 })();

@@ -20,8 +20,11 @@
 .ath .nm{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .ath .nm b{font:600 21px "Barlow Condensed",sans-serif}
 .ath .nm span{font-size:14px;color:var(--muted)}
-.ath .pb{font-size:14px;margin-top:4px;font-variant-numeric:tabular-nums}
-.ath .pb .x{color:var(--muted)}
+.ath .pbl{width:100%;border-collapse:collapse;margin-top:6px;font-size:14px;font-variant-numeric:tabular-nums}
+.ath .pbl td{padding:3px 0;border-top:1px solid var(--line);vertical-align:baseline}
+.ath .pbl .m{font:700 17px "Barlow Condensed",sans-serif;text-align:right;white-space:nowrap;padding-left:8px}
+.ath .pbl .dt{color:var(--muted);text-align:right;white-space:nowrap;padding-left:10px;width:1%}
+.ath .none{font-size:14px;color:var(--muted);margin-top:4px}
 .empty{text-align:center;color:var(--muted);padding:28px 10px}
 .err{color:var(--warn);font-size:14px;font-weight:600;margin:8px 0 0}
 </style>
@@ -34,7 +37,7 @@
   <p class="sub">Zentral für alle Module: Sprint-Tempo und Wettkampfergebnisse.</p>
   <div id="list"></div>
   <a class="btn primary block" href="#neu" id="addBtn">+ Athlet anlegen</a>
-  <p class="note" style="text-align:center">Sprint-Bestzeiten werden aus den Wettkampfergebnissen der letzten 18 Monate übernommen und in Sprint-Tempo bei Bedarf überschrieben.</p>
+  <p class="note" style="text-align:center">Bestleistungen aus allen erfassten Wettkampfergebnissen – ohne Rückenwind über +2,0 m/s und ohne Handzeiten.</p>
 </div>
 
 <div id="viewForm" hidden>
@@ -73,15 +76,19 @@ const $=id=>document.getElementById(id), esc=LA.esc;
 let editId=null, delTimer=null, fromList=false;
 
 function renderList(){
-  const list=LA.athletes(), res=LA.results();
+  const list=LA.athletes(), res=LA.results(), best=LA.bestMarks(res);
   if(!list.length){ $("list").innerHTML='<div class="empty">Noch keine Athleten angelegt.</div>'; return; }
   $("list").innerHTML=list.map(a=>{
     const n=res.filter(r=>r.athleteId===a.id).length;
-    const pb=LA.effectivePBs(a,res);
-    const pbTxt=LA.SPRINT_DISTS.filter(d=>pb[d].v!=null).map(d=>'<span class="x">'+d+" m</span> "+LA.fmtTime(pb[d].v)).join(" · ");
+    // Persönliche Bestleistungen aus allen erfassten Wettkämpfen (ohne Rückenwind > 2,0 und Handzeiten)
+    const pbs=[...best.values()].filter(r=>r.athleteId===a.id)
+      .sort((x,y)=>LA.discOrder(x.discipline)-LA.discOrder(y.discipline)||x.discipline.localeCompare(y.discipline,"de"));
+    const pbTxt=pbs.length?'<table class="pbl">'+pbs.map(r=>"<tr><td>"+esc(r.discipline)+'</td><td class="m">'+esc(r.mark)+" "+LA.markUnit(r)
+      +'</td><td class="dt">'+LA.fmtDate(r.date)+"</td></tr>").join("")+"</table>"
+      :(n?'<div class="none">Keine gültigen Bestleistungen</div>':'<div class="none">Noch keine Wettkampfergebnisse</div>');
     return '<button class="ath" data-id="'+esc(a.id)+'"><div class="nm"><b>'+esc(a.name)+"</b><span>"
       +(a.birthYear?"Jg. "+a.birthYear+" · ":"")+LA.plural(n,"Ergebnis","Ergebnisse")+"</span></div>"
-      +(pbTxt?'<div class="pb">'+pbTxt+"</div>":"")+"</button>";
+      +pbTxt+"</button>";
   }).join("");
 }
 $("list").addEventListener("click",e=>{const b=e.target.closest(".ath"); if(b) location.hash="#bearbeiten/"+encodeURIComponent(b.dataset.id);});
