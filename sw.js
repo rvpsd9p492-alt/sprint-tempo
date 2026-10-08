@@ -1,7 +1,7 @@
 // Offline-Cache: alles wird beim ersten Besuch geladen; danach kommt die App aus dem Cache
 // und aktualisiert sich im Hintergrund, sobald Netz da ist (beim nächsten Start aktiv).
 // Bei jeder Änderung an den Dateien CACHE hochzählen, damit Geräte die neue Version vollständig laden.
-const CACHE = "leichtathletik-v7";
+const CACHE = "leichtathletik-v8";
 const ASSETS = [
   "./",
   "athleten/",

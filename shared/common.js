@@ -40,6 +40,7 @@
       if (m && typeof m.v === "number" && m.v > 0) manual[d] = { v: m.v, over: !!m.over };
     });
     return { id: a.id, name: a.name.slice(0, 40), birthYear: Number.isInteger(a.birthYear) ? a.birthYear : null,
+      sex: a.sex === "m" || a.sex === "w" ? a.sex : null,
       manual, updatedAt: a.updatedAt || new Date().toISOString() };
   }
   /** Athlet aus dem alten Sprint-Tempo-Format (pb60 … pb400) in das zentrale Format bringen. */
@@ -108,12 +109,40 @@
     const c = (String(r.mark).match(/:/g) || []).length;
     return c === 2 ? "h" : c === 1 ? "min" : "s";
   }
-  /** Je Athlet und Disziplin das beste gültige Ergebnis (bei Gleichstand das frühere). Schlüssel: "athleteId|Disziplin". */
-  function bestMarks(list) {
-    const best = new Map();
+  /* ---------- Altersklassen ----------
+     DLV-Regel: maßgeblich ist das Alter, das im Wettkampfjahr erreicht wird (Jahrgang).
+     Masters in 5-Jahres-Klassen (M30, M35 …), 23–29 Männer/Frauen, darunter U23, U20, U18
+     und ab 15 Jahren abwärts Einzeljahrgänge (M15, W14 …). */
+  function ageClass(athlete, dateIso) {
+    if (!athlete || !Number.isInteger(athlete.birthYear) || !dateIso) return null;
+    const age = parseInt(String(dateIso).slice(0, 4), 10) - athlete.birthYear;
+    if (!(age >= 0 && age < 120)) return null;
+    const s = athlete.sex === "w" ? "W" : athlete.sex === "m" ? "M" : "";
+    let label, minAge;
+    if (age >= 30) { minAge = Math.floor(age / 5) * 5; label = s ? s + minAge : "AK " + minAge; }
+    else if (age >= 23) { minAge = 23; label = s === "W" ? "Frauen" : s === "M" ? "Männer" : "Hauptklasse"; }
+    else if (age >= 20) { minAge = 20; label = s ? s + "U23" : "U23"; }
+    else if (age >= 18) { minAge = 18; label = s ? s + "JU20" : "U20"; }
+    else if (age >= 16) { minAge = 16; label = s ? s + "JU18" : "U18"; }
+    else { minAge = age; label = s ? s + age : "AK " + age; }
+    return { label, minAge, age, masters: age >= 30 };
+  }
+  /** Altersklasse eines Ergebnisses (oder null, wenn Athlet/Jahrgang fehlt). */
+  function resultClass(r, athleteList) {
+    const a = (athleteList || athletes()).find((x) => x.id === r.athleteId);
+    return a ? ageClass(a, r.date) : null;
+  }
+
+  /**
+   * Je Athlet und Disziplin das beste gültige Ergebnis (bei Gleichstand das frühere).
+   * Schlüssel "athleteId|Disziplin"; mit opts.byClass zusätzlich je Altersklasse: "athleteId|Klasse|Disziplin".
+   */
+  function bestMarks(list, opts) {
+    const best = new Map(), byClass = !!(opts && opts.byClass), ath = byClass ? (opts.athletes || athletes()) : null;
     list.forEach((r) => {
       if (!isLegal(r)) return;
-      const k = (r.athleteId || "") + "|" + r.discipline, b = best.get(k);
+      const c = byClass ? resultClass(r, ath) : null;
+      const k = (r.athleteId || "") + "|" + (byClass ? (c ? c.label : "") + "|" : "") + r.discipline, b = best.get(k);
       if (!b || better(r.kind, r.value, b.value) || (r.value === b.value && r.date < b.date)) best.set(k, r);
     });
     return best;
@@ -298,8 +327,8 @@
   window.LA = { KEYS, SPRINT, SPRINT_DISTS, PB_MONTHS, load, save, newId, trackDelete, hash, tempoSettings, TEMPO_SETTINGS,
     athletes, saveAthletes, upsertAthlete, deleteAthlete, athleteName,
     results, saveResults, isWindy, isLegal,
-    DISCIPLINE_GROUPS, DISC, discOrder, better, markUnit, bestMarks,
+    DISCIPLINE_GROUPS, DISC, discOrder, better, markUnit, bestMarks, ageClass, resultClass,
     autoPBs, effectivePBs, setManual, resetToRecorded,
     backupStatus, exportBackup, parseBackup, applyBackup, shareOrDownload,
-    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.4" };
+    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.5" };
 })();

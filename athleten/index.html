@@ -25,6 +25,9 @@
 .ath .pbl .m{font:700 17px "Barlow Condensed",sans-serif;text-align:right;white-space:nowrap;padding-left:8px}
 .ath .pbl .dt{color:var(--muted);text-align:right;white-space:nowrap;padding-left:10px;width:1%}
 .ath .none{font-size:14px;color:var(--muted);margin-top:4px}
+.ath .akh{font:600 15px "Barlow Condensed",sans-serif;color:var(--muted);margin-top:10px;letter-spacing:.3px;display:flex;gap:6px;align-items:center}
+.ath .akh .cur{font:600 11px "Barlow",sans-serif;padding:1px 6px;border-radius:5px;background:var(--track);color:var(--track-ink)}
+.ath .pbl .pbm{display:inline-block;font:600 11px "Barlow",sans-serif;padding:0 5px;border-radius:4px;background:var(--signal);color:var(--signal-ink);margin-left:6px;vertical-align:1px}
 .empty{text-align:center;color:var(--muted);padding:28px 10px}
 .err{color:var(--warn);font-size:14px;font-weight:600;margin:8px 0 0}
 </style>
@@ -37,7 +40,7 @@
   <p class="sub">Zentral für alle Module: Sprint-Tempo und Wettkampfergebnisse.</p>
   <div id="list"></div>
   <a class="btn primary block" href="#neu" id="addBtn">+ Athlet anlegen</a>
-  <p class="note" style="text-align:center">Bestleistungen aus allen erfassten Wettkampfergebnissen – ohne Rückenwind über +2,0 m/s und ohne Handzeiten.</p>
+  <p class="note" style="text-align:center">Bestleistungen je Altersklasse aus allen erfassten Wettkampfergebnissen – ohne Rückenwind über +2,0 m/s und ohne Handzeiten. „PB“ = Gesamt-Bestleistung.</p>
 </div>
 
 <div id="viewForm" hidden>
@@ -52,8 +55,15 @@
           <label class="fl" for="iYear">Jahrgang (optional)</label>
           <input type="text" id="iYear" inputmode="numeric" maxlength="4" placeholder="z. B. 2008">
         </div>
-        <div></div>
+        <div>
+          <span class="fl">Geschlecht</span>
+          <div class="seg" id="iSex" role="group" aria-label="Geschlecht">
+            <button type="button" data-v="m">männlich</button>
+            <button type="button" data-v="w">weiblich</button>
+          </div>
+        </div>
       </div>
+      <p class="note" id="akInfo"></p>
       <p class="note" id="statInfo"></p>
     </section>
     <p class="err" id="formErr" role="alert"></p>
@@ -73,21 +83,37 @@
 (function(){
 "use strict";
 const $=id=>document.getElementById(id), esc=LA.esc;
-let editId=null, delTimer=null, fromList=false;
+let editId=null, delTimer=null, fromList=false, sex=null;
+function syncSex(){
+  [...$("iSex").querySelectorAll("button")].forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===sex)));
+  const y=$("iYear").value.trim(), c=/^\d{4}$/.test(y)?LA.ageClass({birthYear:+y,sex},new Date().toISOString().slice(0,10)):null;
+  $("akInfo").textContent=c?"Altersklasse "+new Date().getFullYear()+": "+c.label+(sex?"":" (Geschlecht angeben für M-/W-Klassen)")
+    :"Mit Jahrgang und Geschlecht werden die Altersklassen (z. B. M45) automatisch berechnet.";
+}
 
 function renderList(){
-  const list=LA.athletes(), res=LA.results(), best=LA.bestMarks(res);
+  const list=LA.athletes(), res=LA.results(), today=new Date().toISOString().slice(0,10);
+  const best=LA.bestMarks(res,{byClass:true,athletes:list}), life=new Set([...LA.bestMarks(res).values()].map(r=>r.id));
   if(!list.length){ $("list").innerHTML='<div class="empty">Noch keine Athleten angelegt.</div>'; return; }
   $("list").innerHTML=list.map(a=>{
     const n=res.filter(r=>r.athleteId===a.id).length;
     // Persönliche Bestleistungen aus allen erfassten Wettkämpfen (ohne Rückenwind > 2,0 und Handzeiten)
-    const pbs=[...best.values()].filter(r=>r.athleteId===a.id)
-      .sort((x,y)=>LA.discOrder(x.discipline)-LA.discOrder(y.discipline)||x.discipline.localeCompare(y.discipline,"de"));
-    const pbTxt=pbs.length?'<table class="pbl">'+pbs.map(r=>"<tr><td>"+esc(r.discipline)+'</td><td class="m">'+esc(r.mark)+" "+LA.markUnit(r)
-      +'</td><td class="dt">'+LA.fmtDate(r.date)+"</td></tr>").join("")+"</table>"
+    // … gruppiert nach Altersklasse (aktuelle zuerst); "PB" markiert die Gesamt-Bestleistung
+    const cur=LA.ageClass(a,today);
+    const groups=new Map();
+    [...best.values()].filter(r=>r.athleteId===a.id).forEach(r=>{
+      const c=LA.ageClass(a,r.date), k=c?c.label:"";
+      if(!groups.has(k)) groups.set(k,{c,list:[]});
+      groups.get(k).list.push(r);
+    });
+    const ordered=[...groups.values()].sort((x,y)=>(y.c?y.c.minAge:-1)-(x.c?x.c.minAge:-1));
+    const table=l=>'<table class="pbl">'+l.sort((x,y)=>LA.discOrder(x.discipline)-LA.discOrder(y.discipline)||x.discipline.localeCompare(y.discipline,"de"))
+      .map(r=>"<tr><td>"+esc(r.discipline)+(life.has(r.id)&&groups.size>1?'<span class="pbm">PB</span>':"")+'</td><td class="m">'+esc(r.mark)+" "+LA.markUnit(r)
+      +'</td><td class="dt">'+LA.fmtDate(r.date)+"</td></tr>").join("")+"</table>";
+    const pbTxt=ordered.length?ordered.map(g=>(g.c?'<div class="akh">'+esc(g.c.label)+(cur&&cur.label===g.c.label?'<span class="cur">aktuell</span>':"")+"</div>":(groups.size>1?'<div class="akh">Ohne Jahrgang</div>':""))+table(g.list)).join("")
       :(n?'<div class="none">Keine gültigen Bestleistungen</div>':'<div class="none">Noch keine Wettkampfergebnisse</div>');
     return '<button class="ath" data-id="'+esc(a.id)+'"><div class="nm"><b>'+esc(a.name)+"</b><span>"
-      +(a.birthYear?"Jg. "+a.birthYear+" · ":"")+LA.plural(n,"Ergebnis","Ergebnisse")+"</span></div>"
+      +(a.birthYear?"Jg. "+a.birthYear+" · ":"")+(cur?esc(cur.label)+" · ":"")+LA.plural(n,"Ergebnis","Ergebnisse")+"</span></div>"
       +pbTxt+"</button>";
   }).join("");
 }
@@ -100,10 +126,13 @@ function openForm(id){
   editId=a?a.id:null;
   $("formHead").textContent=a?"Athlet bearbeiten":"Athlet anlegen";
   $("iName").value=a?a.name:""; $("iYear").value=a&&a.birthYear?a.birthYear:"";
+  sex=a?a.sex:null; syncSex();
   $("del").hidden=!a; disarm(); $("formErr").textContent="";
   const n=a?LA.results().filter(r=>r.athleteId===a.id).length:0;
   $("statInfo").textContent=a?LA.plural(n,"Wettkampfergebnis","Wettkampfergebnisse")+" erfasst.":"";
 }
+$("iSex").addEventListener("click",e=>{const b=e.target.closest("button"); if(!b) return; sex=sex===b.dataset.v?null:b.dataset.v; syncSex();});
+$("iYear").addEventListener("input",syncSex);
 $("form").addEventListener("submit",e=>{
   e.preventDefault();
   const name=$("iName").value.trim(), y=$("iYear").value.trim();
@@ -113,7 +142,7 @@ $("form").addEventListener("submit",e=>{
   const yr=y?+y:null, now=new Date().getFullYear();
   if(y&&!(/^\d{4}$/.test(y)&&yr>=1920&&yr<=now)){ $("formErr").textContent="Jahrgang vierstellig, z. B. 2008."; return; }
   const a=editId?list.find(x=>x.id===editId):{id:LA.newId("a"),manual:{}};
-  a.name=name; a.birthYear=yr;
+  a.name=name; a.birthYear=yr; a.sex=sex;
   if(!LA.upsertAthlete(a)){ $("formErr").textContent="Speichern fehlgeschlagen."; return; }
   close();
 });

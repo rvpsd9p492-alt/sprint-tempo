@@ -48,6 +48,18 @@ h3:first-of-type{margin-top:4px}
     <p>Training planen, Wettkämpfe festhalten.</p>
   </div>
 
+  <section id="recBox" hidden aria-labelledby="recHead">
+    <h2 id="recHead">Neues Passwort setzen</h2>
+    <div id="recForm">
+      <label class="fl" for="recPw" style="margin-top:0">Neues Passwort (mindestens 8 Zeichen)</label>
+      <input type="password" id="recPw" autocomplete="new-password" style="font:500 16px Barlow,sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-height:42px">
+      <label class="fl" for="recPw2">Wiederholen</label>
+      <input type="password" id="recPw2" autocomplete="new-password" style="font:500 16px Barlow,sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-height:42px">
+      <div class="row" style="margin-top:12px"><button class="btn primary" id="recSave">Passwort speichern</button></div>
+    </div>
+    <p class="note" id="recMsg" aria-live="polite"></p>
+  </section>
+
   <div class="banner" id="bkBanner" hidden>
     <span id="bkBannerTxt"></span>
     <button class="btn primary" id="bkBannerBtn">Jetzt sichern</button>
@@ -107,6 +119,7 @@ h3:first-of-type{margin-top:4px}
           <button class="btn primary" id="cIn">Anmelden</button>
           <button class="btn" id="cUp">Konto erstellen</button>
         </div>
+        <button class="link" id="cForgot" style="margin-top:8px">Passwort vergessen?</button>
       </div>
       <div id="cloudIn" hidden>
         <div class="cloudst"><span class="dot" id="cDot"></span><span id="cState"></span></div>
@@ -114,6 +127,12 @@ h3:first-of-type{margin-top:4px}
         <div class="row" style="margin-top:12px">
           <button class="btn primary" id="cSync">Jetzt synchronisieren</button>
           <button class="btn" id="cOut">Abmelden</button>
+        </div>
+        <button class="link" id="cPwChg" style="margin-top:8px">Passwort ändern</button>
+        <div id="pwChg" hidden>
+          <label class="fl" for="chgPw">Neues Passwort (mindestens 8 Zeichen)</label>
+          <input type="password" id="chgPw" autocomplete="new-password" style="font:500 16px Barlow,sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-height:42px">
+          <div class="row" style="margin-top:10px"><button class="btn primary" id="chgSave">Speichern</button><button class="btn" id="chgCancel">Abbrechen</button></div>
         </div>
       </div>
       <p class="note" id="cMsg" aria-live="polite"></p>
@@ -217,6 +236,43 @@ async function auth(fn){
   render();
 }
 $("cIn").addEventListener("click",()=>auth(C.signIn));
+const warn=m=>'<span class="warn">'+LA.esc(m)+"</span>";
+$("cForgot").addEventListener("click",async()=>{
+  const email=$("cEmail").value.trim();
+  if(!/^\S+@\S+\.\S+$/.test(email)){ $("cMsg").innerHTML=warn("Erst oben deine E-Mail-Adresse eingeben, dann „Passwort vergessen?“ tippen."); return; }
+  $("cForgot").disabled=true; $("cMsg").textContent="Bitte warten …";
+  try{
+    await C.requestPasswordReset(email);
+    $("cMsg").innerHTML='<span class="ok">E-Mail verschickt.</span> Den Link darin öffnen (auch in Safari oder am PC möglich), dort ein neues Passwort setzen und dich danach hier anmelden. Keine Mail? Spam-Ordner prüfen; es geht nur wenige Mails pro Stunde.';
+  }catch(e){ $("cMsg").innerHTML=warn(e.message); }
+  $("cForgot").disabled=false;
+});
+$("cPwChg").addEventListener("click",()=>{ $("pwChg").hidden=false; $("cPwChg").hidden=true; $("chgPw").focus(); });
+$("chgCancel").addEventListener("click",()=>{ $("pwChg").hidden=true; $("cPwChg").hidden=false; $("chgPw").value=""; });
+$("chgSave").addEventListener("click",async()=>{
+  const pw=$("chgPw").value;
+  if(pw.length<8){ $("cMsg").innerHTML=warn("Passwort mit mindestens 8 Zeichen eingeben."); return; }
+  try{ await C.updatePassword(pw); $("chgPw").value=""; $("pwChg").hidden=true; $("cPwChg").hidden=false; $("cMsg").innerHTML='<span class="ok">Passwort geändert.</span> Auf anderen Geräten bleibst du angemeldet.'; }
+  catch(e){ $("cMsg").innerHTML=warn(e.message); }
+});
+// Rücksetz-Link aus der E-Mail (öffnet diese Seite mit #access_token=…&type=recovery)
+const REC=C.configured?C.readRecoveryLink():null;
+if(REC){
+  history.replaceState(null,"",location.pathname+location.search); // Token nicht in der Adresse lassen
+  $("recBox").hidden=false; window.scrollTo(0,0);
+  if(REC.error){ $("recForm").hidden=true; $("recMsg").innerHTML=warn(REC.error); }
+  $("recSave").addEventListener("click",async()=>{
+    const a=$("recPw").value, b=$("recPw2").value;
+    if(a.length<8){ $("recMsg").innerHTML=warn("Passwort mit mindestens 8 Zeichen eingeben."); return; }
+    if(a!==b){ $("recMsg").innerHTML=warn("Die beiden Eingaben stimmen nicht überein."); return; }
+    $("recSave").disabled=true; $("recMsg").textContent="Bitte warten …";
+    try{
+      const r=await C.updatePassword(a,REC.token);
+      $("recForm").hidden=true;
+      $("recMsg").innerHTML='<span class="ok">Neues Passwort gespeichert.</span> Öffne jetzt die App vom Home-Bildschirm und melde dich unter Datensicherung → Cloud'+(r.email?" als "+LA.esc(r.email):"")+" mit dem neuen Passwort an.";
+    }catch(e){ $("recMsg").innerHTML=warn(e.message); $("recSave").disabled=false; }
+  });
+}
 $("cUp").addEventListener("click",()=>auth(C.signUp));
 $("cSync").addEventListener("click",async()=>{ $("cMsg").textContent=""; const x=await C.sync({force:true}); if(x.error) $("cMsg").innerHTML='<span class="warn">'+LA.esc(x.error)+"</span>"; else if(x.pending&&navigator.onLine===false) $("cMsg").textContent="Offline – wird synchronisiert, sobald Internet da ist."; render(); });
 $("cOut").addEventListener("click",()=>{ if(confirm("Abmelden? Die Daten bleiben auf diesem Gerät erhalten.")) { C.signOut(); $("cMsg").textContent=""; render(); } });

@@ -8,6 +8,7 @@
   --bg:#E9EEF2; --surface:#FFFFFF; --ink:#13202E; --muted:#5B6B7B; --line:#C9D3DC;
   --track:#1E4A7A; --track-ink:#FFFFFF; --signal:#F2C230; --signal-ink:#2A2000;
   --warn:#B23A2E; --ok:#2E7D4F; --link:#1E4A7A; --clay:#B8552E;
+  --s-indoor:#2a78d6; --s-outdoor:#eb6834; --grid:#e3e8ed;
   color-scheme:light dark;
 }
 @media (prefers-color-scheme: dark){
@@ -15,12 +16,14 @@
     --bg:#0E1824; --surface:#172536; --ink:#E6EDF3; --muted:#93A3B4; --line:#2A3D52;
     --track:#2D68A8; --track-ink:#FFFFFF; --signal:#F2C230; --signal-ink:#2A2000;
     --warn:#E06A5C; --ok:#5DBB86; --link:#8DB8E8; --clay:#E08A5E;
+    --s-indoor:#3987e5; --s-outdoor:#d95926; --grid:#22344a;
   }
 }
 :root[data-theme="dark"]{
   --bg:#0E1824; --surface:#172536; --ink:#E6EDF3; --muted:#93A3B4; --line:#2A3D52;
   --track:#2D68A8; --track-ink:#FFFFFF; --signal:#F2C230; --signal-ink:#2A2000;
   --warn:#E06A5C; --ok:#5DBB86; --link:#8DB8E8; --clay:#E08A5E;
+    --s-indoor:#3987e5; --s-outdoor:#d95926; --grid:#22344a;
 }
 *,*::before,*::after{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -62,8 +65,10 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .banner .btn{min-height:38px;padding:7px 12px}
 .badge{display:inline-block;font:600 12px "Barlow",sans-serif;padding:2px 7px;border-radius:5px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
 .badge.pb{background:var(--signal);border-color:var(--signal);color:var(--signal-ink)}
-.badge.indoor{border-color:var(--track);color:var(--link)}
-.badge.outdoor{border-color:var(--clay);color:var(--clay)}
+.badge.indoor,.badge.outdoor{color:var(--ink)}
+.badge.indoor::before,.badge.outdoor::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:1px}
+.badge.indoor::before{background:var(--s-indoor)}
+.badge.outdoor::before{background:var(--s-outdoor)}
 .badge.champ{border-color:var(--ink);color:var(--ink)}
 .foot{font-size:13px;color:var(--muted);text-align:center;margin-top:16px}
 details{background:var(--surface);border-radius:14px;margin-bottom:12px}

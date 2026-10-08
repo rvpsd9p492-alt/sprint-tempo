@@ -113,6 +113,41 @@
     if (d && d.access_token) { storeSession(d); emit(); await sync({ force: true }); return { confirmed: true }; }
     return { confirmed: false }; // Bestätigungs-Mail verschickt
   }
+  /* ---------- Passwort ---------- */
+  /** Schickt eine E-Mail mit Link zum Zurücksetzen (öffnet die Übersichtsseite mit #…type=recovery). */
+  async function requestPasswordReset(email) {
+    if (!configured) throw new Error("Cloud-Sicherung ist nicht eingerichtet.");
+    const back = location.origin + location.pathname.replace(/[^/]*$/, "");
+    try {
+      await http("/auth/v1/recover?redirect_to=" + encodeURIComponent(back), { method: "POST", body: { email } });
+    } catch (e) { throw new Error(germanAuthError(e)); }
+  }
+  /** Liest einen Rücksetz-Link aus der Adresse (#access_token=…&type=recovery) oder dessen Fehlermeldung. */
+  function readRecoveryLink() {
+    const h = new URLSearchParams(String(location.hash || "").replace(/^#/, ""));
+    if (h.get("type") === "recovery" && h.get("access_token")) return { token: h.get("access_token") };
+    if (h.get("error") || h.get("error_code")) {
+      const code = h.get("error_code") || h.get("error");
+      return { error: /expired/i.test(code) ? "Der Link ist abgelaufen oder wurde schon benutzt – bitte erneut „Passwort vergessen“ wählen."
+        : "Der Link ist ungültig (" + (h.get("error_description") || code) + ")." };
+    }
+    return null;
+  }
+  /** Setzt ein neues Passwort – mit dem Token aus dem Rücksetz-Link oder der aktuellen Anmeldung. */
+  async function updatePassword(password, recoveryToken) {
+    if (!configured) throw new Error("Cloud-Sicherung ist nicht eingerichtet.");
+    let tok = recoveryToken;
+    if (!tok) tok = (await token()).access_token;
+    try {
+      const u = await http("/auth/v1/user", { method: "PUT", token: tok, body: { password } });
+      return { email: u && u.email };
+    } catch (e) {
+      if (/same.*password|different from the old/i.test(e.message)) throw new Error("Das neue Passwort muss sich vom alten unterscheiden.");
+      if (/weak|at least|characters/i.test(e.message)) throw new Error("Passwort zu schwach (mindestens 8 Zeichen).");
+      throw new Error(e.code === 401 || e.code === 403 ? "Der Link ist abgelaufen – bitte erneut „Passwort vergessen“ wählen." : germanAuthError(e));
+    }
+  }
+
   function resetSyncState() {
     const s = st();
     delete s.cursor; delete s.lastSyncAt; delete s.pushed; delete s.settingsHash; delete s.settingsAt; delete s.error;
@@ -269,5 +304,5 @@
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") schedule(300); });
   if (configured) setTimeout(() => sync(), 300);
 
-  LA.cloud = { configured, status, signIn, signUp, signOut, sync, onStatus: (fn) => { listeners.add(fn); return () => listeners.delete(fn); } };
+  LA.cloud = { configured, status, signIn, signUp, signOut, sync, requestPasswordReset, readRecoveryLink, updatePassword, onStatus: (fn) => { listeners.add(fn); return () => listeners.delete(fn); } };
 })();

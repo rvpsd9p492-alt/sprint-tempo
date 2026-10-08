@@ -47,6 +47,18 @@
 .chk{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:15px;cursor:pointer}
 .chk input{width:22px;height:22px;accent-color:var(--track)}
 .res .who{font-weight:600;color:var(--ink)}
+.pbs .akh{font:600 14px "Barlow Condensed",sans-serif;color:var(--muted);padding-top:8px;letter-spacing:.3px}
+.badge.pbc{background:transparent;border-color:var(--signal);color:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted);margin:2px 0 6px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%}
+.legend i.ring{background:transparent;border:2px solid var(--muted);width:9px;height:9px;box-sizing:border-box}
+.legend i.step{width:14px;height:2px;border-radius:1px;background:var(--muted)}
+#chart{width:100%;touch-action:pan-y}
+#chart svg{display:block;width:100%;overflow:visible}
+#chart text{font:500 11px "Barlow",sans-serif;fill:var(--muted)}
+#chart .ak{font-weight:600;fill:var(--ink)}
+#chInfo{font-size:14px;min-height:20px;margin-top:6px;font-variant-numeric:tabular-nums}
 .pbs .who{font:600 15px "Barlow",sans-serif;color:var(--muted);padding-top:12px}
 .link{color:var(--link);font:600 14px "Barlow",sans-serif;text-decoration:none}
 </style>
@@ -72,6 +84,7 @@
         <select id="fVenue"><option value="">Alle</option><option value="indoor">Halle</option><option value="outdoor">Freiluft</option></select></div>
       <div><label class="fl" for="fDisc">Disziplin</label><select id="fDisc"></select></div>
       <div><label class="fl" for="fChamp">Meisterschaft</label><select id="fChamp"></select></div>
+      <div><label class="fl" for="fAk">Altersklasse</label><select id="fAk"></select></div>
     </div>
     <div class="row" style="justify-content:space-between;margin-top:10px">
       <p class="count" id="count" style="margin:0"></p>
@@ -87,10 +100,20 @@
     </div>
   </section>
 
+  <section id="chartBox" aria-labelledby="chHead" hidden>
+    <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:nowrap">
+      <h2 id="chHead" style="margin:0">Leistungsentwicklung</h2>
+      <select id="chDisc" aria-label="Disziplin im Diagramm" style="width:auto;max-width:55%"></select>
+    </div>
+    <div class="legend" id="chLegend" style="margin-top:10px"></div>
+    <div id="chart"></div>
+    <p id="chInfo"></p>
+  </section>
+
   <section id="pbBox" aria-labelledby="pbHead" hidden>
     <h2 id="pbHead">Bestleistungen</h2>
     <table class="pbs" id="pbTable"></table>
-    <p class="note">Ohne Rückenwind über +2,0 m/s und ohne Handzeiten.</p>
+    <p class="note">Je Altersklasse; ohne Rückenwind über +2,0 m/s und ohne Handzeiten.</p>
   </section>
 
   <div id="list"></div>
@@ -115,6 +138,7 @@
   <section>
     <div class="row" style="justify-content:space-between"><label class="fl" for="iAth" style="margin:0">Athlet</label><a class="link" href="../athleten/?back=ergebnisse">Athleten verwalten</a></div>
     <select id="iAth" style="margin-top:6px"></select>
+    <p class="hint" id="akHint"></p>
     <p class="hint" id="noAthHint" hidden>Noch keine Athleten angelegt – <a class="link" href="../athleten/?back=ergebnisse#neu">jetzt anlegen</a>.</p>
     <div class="grid2" style="margin-top:12px">
       <div>
@@ -212,7 +236,9 @@ function persist(){
   if(!LA.save(LA.KEYS.results,R)) alert("Speichern fehlgeschlagen – Gerätespeicher voll?");
 }
 const FKEY="laResults.filters";
-let F=Object.assign({ath:"",year:"",disc:"",champ:"",venue:""},LA.load(FKEY,{}));
+const NOF={ath:"",year:"",disc:"",champ:"",venue:"",ak:""};
+let F=Object.assign({},NOF,LA.load(FKEY,{}));
+const akOf=r=>{ const c=LA.resultClass(r,ATH); return c?c.label:""; };
 
 /* ---------- Ergebnis lesen & formatieren ---------- */
 const STATUS={DNF:"DNF",AUFG:"DNF",DNS:"DNS",DQ:"DQ",DISQ:"DQ",NM:"o.g.V.",OGV:"o.g.V.",NHL:"o.g.V."};
@@ -263,8 +289,8 @@ const isChamp=r=>!!(r.champ&&r.champ.trim());
 
 /* ---------- Bestleistungen ---------- */
 const bestOf=LA.bestMarks;
-function badgeSets(){
-  const pb=new Set([...bestOf(R).values()].map(r=>r.id));
+function badgeSets(){ // PB je Altersklasse (ohne Jahrgang: gesamt), SB je Jahr
+  const pb=new Set([...bestOf(R,{byClass:true,athletes:ATH}).values()].map(r=>r.id));
   const sb=new Set(), byYear=new Map();
   R.forEach(r=>{const y=r.date.slice(0,4); if(!byYear.has(y)) byYear.set(y,[]); byYear.get(y).push(r);});
   byYear.forEach(list=>bestOf(list).forEach(r=>sb.add(r.id)));
@@ -288,33 +314,47 @@ function buildFilters(){
   $("fChamp").innerHTML=opt("","Alle",F.champ)+opt("__yes","Nur Meisterschaften",F.champ)+opt("__no","Ohne Meisterschaft",F.champ)
     +(champs.length?'<optgroup label="Meisterschaft">'+champs.map(c=>opt(c,c,F.champ)).join("")+"</optgroup>":"");
   $("fVenue").value=F.venue;
+  const aks=new Map();
+  R.filter(r=>!F.ath||(F.ath==="__none"?!r.athleteId:r.athleteId===F.ath)).forEach(r=>{const c=LA.resultClass(r,ATH); if(c) aks.set(c.label,c.minAge);});
+  if(F.ak&&!aks.has(F.ak)) F.ak="";
+  $("fAk").innerHTML=opt("","Alle",F.ak)+[...aks.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],"de")).map(([l])=>opt(l,l,F.ak)).join("");
+  $("fAk").disabled=aks.size===0;
+}
+function passes(r,ignoreDisc){
+  return (!F.ath||(F.ath==="__none"?!r.athleteId:r.athleteId===F.ath))&&
+    (!F.year||r.date.slice(0,4)===F.year)&&
+    (ignoreDisc||!F.disc||r.discipline===F.disc)&&
+    (!F.venue||r.venue===F.venue)&&
+    (!F.ak||akOf(r)===F.ak)&&
+    (!F.champ||(F.champ==="__yes"?isChamp(r):F.champ==="__no"?!isChamp(r):(r.champ||"").trim()===F.champ));
 }
 function filtered(){
-  return R.filter(r=>
-    (!F.ath||(F.ath==="__none"?!r.athleteId:r.athleteId===F.ath))&&
-    (!F.year||r.date.slice(0,4)===F.year)&&
-    (!F.disc||r.discipline===F.disc)&&
-    (!F.venue||r.venue===F.venue)&&
-    (!F.champ||(F.champ==="__yes"?isChamp(r):F.champ==="__no"?!isChamp(r):(r.champ||"").trim()===F.champ))
-  ).sort((a,b)=>b.date.localeCompare(a.date)||String(b.createdAt).localeCompare(String(a.createdAt)));
+  return R.filter(r=>passes(r,false))
+    .sort((a,b)=>b.date.localeCompare(a.date)||String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 function renderList(){
   buildFilters();
-  const list=filtered(), active=!!(F.ath||F.year||F.disc||F.champ||F.venue);
+  const list=filtered(), active=!!(F.ath||F.year||F.disc||F.champ||F.venue||F.ak);
   const single=!!F.ath; // nur ein Athlet sichtbar → Namen nicht wiederholen
   $("filterBox").hidden=R.length===0;
   $("fReset").hidden=!active;
   $("count").textContent=active?list.length+" von "+R.length+" Ergebnissen":R.length+" Ergebnis"+(R.length===1?"":"se");
 
   // Bestleistungen der aktuellen Auswahl
-  const best=[...bestOf(list).values()].sort((a,b)=>aName(a.athleteId).localeCompare(aName(b.athleteId),"de")||discOrder(a.discipline)-discOrder(b.discipline)||a.discipline.localeCompare(b.discipline,"de"));
+  const cAge=r=>{const c=LA.resultClass(r,ATH); return c?c.minAge:-1;};
+  const best=[...bestOf(list,{byClass:true,athletes:ATH}).values()].sort((a,b)=>aName(a.athleteId).localeCompare(aName(b.athleteId),"de")||cAge(b)-cAge(a)||discOrder(a.discipline)-discOrder(b.discipline)||a.discipline.localeCompare(b.discipline,"de"));
   $("pbBox").hidden=best.length===0;
   $("pbHead").textContent=active?"Bestleistungen in dieser Auswahl":"Bestleistungen";
-  let lastWho=null;
-  $("pbTable").innerHTML=best.map(r=>
-    (!single&&r.athleteId!==lastWho?(lastWho=r.athleteId,'<tr><td colspan="2" class="who">'+esc(aName(r.athleteId))+"</td></tr>"):"")
-    +"<tr><td>"+esc(r.discipline)+'<div class="dt">'+LA.fmtDate(r.date)+" · "+venueTxt(r.venue)+(r.wind!=null?" · "+fmtWind(r.wind):"")+'</div></td><td class="m">'+esc(r.mark)+" "+unit(r)+"</td></tr>"
-  ).join("");
+  let lastWho=null, lastAk=null;
+  $("pbTable").innerHTML=best.map(r=>{
+    const ak=akOf(r), newWho=r.athleteId!==lastWho;
+    let h="";
+    if(newWho){ lastWho=r.athleteId; lastAk=null; if(!single) h+='<tr><td colspan="2" class="who">'+esc(aName(r.athleteId))+"</td></tr>"; }
+    if(ak!==lastAk){ lastAk=ak; if(ak) h+='<tr><td colspan="2" class="akh">'+esc(ak)+"</td></tr>"; }
+    return h
+    +"<tr><td>"+esc(r.discipline)+'<div class="dt">'+LA.fmtDate(r.date)+" · "+venueTxt(r.venue)+(r.wind!=null?" · "+fmtWind(r.wind):"")+'</div></td><td class="m">'+esc(r.mark)+" "+unit(r)+"</td></tr>";
+  }).join("");
+  renderChart();
 
   const {pb,sb}=badgeSets();
   let html="", year=null;
@@ -326,9 +366,11 @@ function renderList(){
     if(r.wind!=null) bits.push('<span class="'+(windy(r)?"wa":"")+'">Wind '+fmtWind(r.wind)+(windy(r)?" (w)":"")+"</span>");
     if(r.hand) bits.push("handgestoppt");
     if(r.place) bits.push("Platz "+r.place);
-    if(pb.has(r.id)) bits.push('<span class="badge pb">PB</span>'); else if(sb.has(r.id)) bits.push('<span class="badge">SB</span>');
+    const ak=akOf(r);
+    if(pb.has(r.id)) bits.push('<span class="badge pb">PB'+(ak?" "+esc(ak):"")+"</span>"); else if(sb.has(r.id)) bits.push('<span class="badge">SB</span>');
     html+='<button class="res" data-id="'+esc(r.id)+'">'
       +'<div class="top">'+(single?"":'<span class="who">'+esc(aName(r.athleteId))+"</span>")+'<span class="date">'+LA.fmtDate(r.date)+'</span><span class="badge '+(r.venue==="indoor"?"indoor":"outdoor")+'">'+venueTxt(r.venue)+"</span>"
+      +(ak?'<span class="badge">'+esc(ak)+"</span>":"")
       +(isChamp(r)?'<span class="badge champ">'+esc(r.champ)+"</span>":"")+"</div>"
       +'<div class="mid"><span class="disc">'+esc(r.discipline)+'</span><span class="mark">'+esc(r.mark)+(unit(r)?"<small>"+unit(r)+"</small>":"")+"</span></div>"
       +(bits.length?'<div class="bot">'+bits.join('<span class="sep">·</span>')+"</div>":"")
@@ -358,19 +400,122 @@ $("unGo").addEventListener("click",()=>{
   R.forEach(r=>{ if(!r.athleteId){ r.athleteId=id; r.updatedAt=now; } });
   persist(); renderList();
 });
-["fAth","fYear","fDisc","fChamp","fVenue"].forEach(id=>$(id).addEventListener("change",()=>{
-  F={ath:$("fAth").value,year:$("fYear").value,disc:$("fDisc").value,champ:$("fChamp").value,venue:$("fVenue").value};
+["fAth","fYear","fDisc","fChamp","fVenue","fAk"].forEach(id=>$(id).addEventListener("change",()=>{
+  F={ath:$("fAth").value,year:$("fYear").value,disc:$("fDisc").value,champ:$("fChamp").value,venue:$("fVenue").value,ak:$("fAk").value};
   LA.save(FKEY,F); renderList();
 }));
-$("fReset").addEventListener("click",()=>{F={ath:"",year:"",disc:"",champ:"",venue:""}; LA.save(FKEY,F); renderList();});
+$("fReset").addEventListener("click",()=>{F=Object.assign({},NOF); LA.save(FKEY,F); renderList();});
 $("list").addEventListener("click",e=>{const b=e.target.closest(".res"); if(b) go("#bearbeiten/"+b.dataset.id);});
 $("bkBtn").addEventListener("click",async()=>{const r=await LA.exportBackup(); if(r.res!=="aborted") renderList();});
+
+/* ---------- Leistungsentwicklung (SVG, ohne Bibliothek) ---------- */
+let chDisc=null, chPts=[];
+const MON=["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+function chartAthlete(){ if(F.ath&&F.ath!=="__none") return F.ath; if(!F.ath&&ATH.length===1) return ATH[0].id; return null; }
+function fmtVal(v,kind,dec){
+  if(kind==="p") return String(Math.round(v));
+  if(kind==="t"&&v>=60){ const m=Math.floor(v/60), sec=v-m*60; return m+":"+(sec<10?"0":"")+sec.toFixed(dec).replace(".",","); }
+  return v.toFixed(dec).replace(".",",");
+}
+function niceTicks(lo,hi,n){
+  const raw=(hi-lo)/n, mag=Math.pow(10,Math.floor(Math.log10(raw))), f=raw/mag;
+  const step=(f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*mag;
+  const t0=Math.floor(lo/step)*step, t1=Math.ceil(hi/step)*step, out=[];
+  for(let v=t0; v<=t1+step/2; v+=step) out.push(+v.toFixed(6));
+  return {ticks:out, step, dec:Math.max(0,-Math.floor(Math.log10(step)+1e-9)+(step/mag===2.5?1:0))};
+}
+function renderChart(){
+  const box=$("chartBox"), aid=chartAthlete();
+  const base=aid?R.filter(r=>r.athleteId===aid&&r.value!=null&&passes(r,true)):[];
+  const cnt=new Map(); base.forEach(r=>cnt.set(r.discipline,(cnt.get(r.discipline)||0)+1));
+  const discs=[...cnt.keys()].filter(d=>cnt.get(d)>=2).sort((a,b)=>discOrder(a)-discOrder(b)||a.localeCompare(b,"de"));
+  if(!discs.length){ box.hidden=true; return; }
+  const d=F.disc&&discs.includes(F.disc)?F.disc:discs.includes(chDisc)?chDisc:discs.slice().sort((a,b)=>cnt.get(b)-cnt.get(a))[0];
+  chDisc=d;
+  $("chDisc").innerHTML=discs.map(x=>opt(x,x,d)).join(""); $("chDisc").disabled=!!F.disc||discs.length<2;
+  box.hidden=false;
+  chPts=base.filter(r=>r.discipline===d).sort((a,b)=>a.date.localeCompare(b.date)||String(a.createdAt).localeCompare(String(b.createdAt)));
+  drawChart(chPts,ATH.find(a=>a.id===aid));
+}
+function drawChart(pts,ath){
+  const W=Math.max(280,$("chart").clientWidth||320), H=240, m={l:50,r:14,t:36,b:26};
+  const iw=W-m.l-m.r, ih=H-m.t-m.b, kind=pts[0].kind, inv=kind==="t", day=864e5;
+  const ts=r=>Date.parse(r.date+"T12:00:00Z");
+  let x0=Math.min(...pts.map(ts)), x1=Math.max(...pts.map(ts));
+  if(x1-x0<60*day){ x0-=30*day; x1+=30*day; }
+  const padX=(x1-x0)*0.05; x0-=padX; x1+=padX;
+  const vals=pts.map(r=>r.value); let lo=Math.min(...vals), hi=Math.max(...vals);
+  if(hi-lo<1e-9){ const e=Math.max(Math.abs(lo)*0.02,0.05); lo-=e; hi+=e; }
+  const nt=niceTicks(lo,hi,4), y0=nt.ticks[0], y1=nt.ticks[nt.ticks.length-1];
+  const X=t=>m.l+(t-x0)/(x1-x0)*iw;
+  const Y=v=>inv?m.t+(v-y0)/(y1-y0)*ih:m.t+ih-(v-y0)/(y1-y0)*ih;
+  const col=r=>r.venue==="indoor"?"var(--s-indoor)":"var(--s-outdoor)";
+  let g="";
+  // Gitter + y-Achse
+  nt.ticks.forEach(v=>{ const y=Y(v).toFixed(1);
+    g+='<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+y+'" y2="'+y+'" style="stroke:var(--grid)" stroke-width="1"/>'
+      +'<text x="'+(m.l-6)+'" y="'+y+'" dy="0.32em" text-anchor="end">'+fmtVal(v,kind,nt.dec)+"</text>"; });
+  g+='<text x="0" y="11">'+(inv?"schneller ↑":"besser ↑")+"</text>";
+  // x-Achse: Jahre oder Monate
+  const span=(x1-x0)/(365.25*day), d0=new Date(x0), ticks=[];
+  if(span>=1.5){ for(let y=d0.getUTCFullYear()+1; Date.UTC(y,0,1)<=x1; y++) ticks.push([Date.UTC(y,0,1),String(y)]); }
+  else { const stepM=span<0.5?1:span<1?2:3; let y=d0.getUTCFullYear(), mo=d0.getUTCMonth()+1;
+    for(;;){ if(mo>11){mo-=12;y++;} const t=Date.UTC(y,mo,1); if(t>x1) break; if(mo%stepM===0) ticks.push([t,MON[mo]+" "+String(y).slice(2)]); mo++; } }
+  let lastX=-99; ticks.forEach(([t,l])=>{ const x=X(t); if(x-lastX<38) return; lastX=x;
+    g+='<line x1="'+x.toFixed(1)+'" x2="'+x.toFixed(1)+'" y1="'+(m.t+ih)+'" y2="'+(m.t+ih+4)+'" style="stroke:var(--line)"/>'
+      +'<text x="'+x.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle">'+l+"</text>"; });
+  g+='<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+(m.t+ih)+'" y2="'+(m.t+ih)+'" style="stroke:var(--line)" stroke-width="1"/>';
+  // Altersklassen-Grenzen
+  if(ath&&Number.isInteger(ath.birthYear)){
+    let prev=null, lastL=-99;
+    // erst ab dem Jahr des ersten Ergebnisses (der Rand davor gehört zu keiner Klasse)
+    const yFirst=+pts[0].date.slice(0,4);
+    for(let y=yFirst; Date.UTC(y,0,1)<=x1; y++){
+      const c=LA.ageClass(ath,y+"-06-30"); if(!c||c.label===prev) continue;
+      const t=y===yFirst?x0:Date.UTC(y,0,1), x=y===yFirst?m.l:X(t);
+      if(prev!==null) g+='<line x1="'+x.toFixed(1)+'" x2="'+x.toFixed(1)+'" y1="'+m.t+'" y2="'+(m.t+ih)+'" style="stroke:var(--line)" stroke-width="1"/>';
+      if(x-lastL>=34){ g+='<text class="ak" x="'+(x+4).toFixed(1)+'" y="'+(m.t-6)+'">'+esc(c.label)+"</text>"; lastL=x; }
+      prev=c.label;
+    }
+  }
+  // Bestleistungs-Verlauf (gültige Leistungen)
+  let best=null, path="";
+  pts.forEach(r=>{ if(!legal(r)) return; const x=X(ts(r));
+    if(best===null){ best=r.value; path="M"+x.toFixed(1)+" "+Y(best).toFixed(1); }
+    else if(better(kind,r.value,best)){ path+=" H"+x.toFixed(1)+" V"+Y(r.value).toFixed(1); best=r.value; } });
+  if(path){ path+=" H"+X(ts(pts[pts.length-1])).toFixed(1); g+='<path d="'+path+'" style="fill:none;stroke:var(--muted)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'; }
+  // Punkte + Trefferflächen
+  pts.forEach((r,i)=>{ const x=X(ts(r)).toFixed(1), y=Y(r.value).toFixed(1), ok=legal(r);
+    g+='<circle class="pt" data-i="'+i+'" cx="'+x+'" cy="'+y+'" r="5" style="fill:'+(ok?col(r):"var(--surface)")+';stroke:'+(ok?"var(--surface)":col(r))+'" stroke-width="2"/>'; });
+  pts.forEach((r,i)=>{ g+='<circle class="hit" data-i="'+i+'" cx="'+X(ts(r)).toFixed(1)+'" cy="'+Y(r.value).toFixed(1)+'" r="14" fill="transparent" style="cursor:pointer"/>'; });
+  const n=pts.length;
+  $("chart").innerHTML='<svg viewBox="0 0 '+W+" "+H+'" width="'+W+'" height="'+H+'" role="img" aria-label="Leistungsentwicklung '+esc(pts[0].discipline)+": "+n+" Ergebnisse, beste gültige Leistung "+(best!=null?fmtVal(best,kind,2):"–")+'">'+g+"</svg>";
+  // Legende: nur, was vorkommt
+  const has=v=>pts.some(r=>r.venue===v), anyBad=pts.some(r=>!legal(r));
+  $("chLegend").innerHTML=(has("indoor")?'<span><i style="background:var(--s-indoor)"></i>Halle</span>':"")
+    +(has("outdoor")?'<span><i style="background:var(--s-outdoor)"></i>Freiluft</span>':"")
+    +(anyBad?'<span><i class="ring"></i>Wind > +2,0 / Handzeit</span>':"")
+    +(path?'<span><i class="step"></i>Bestleistung</span>':"");
+  showPoint(null);
+}
+function showPoint(i){
+  [...$("chart").querySelectorAll("circle.pt")].forEach(c=>c.setAttribute("r",+c.dataset.i===i?"7":"5"));
+  if(i==null||!chPts[i]){ $("chInfo").innerHTML='<span style="color:var(--muted)">Punkt antippen für Details.</span>'; return; }
+  const r=chPts[i], ak=akOf(r), bits=[LA.fmtDate(r.date),"<b>"+esc(r.mark)+" "+unit(r)+"</b>",venueTxt(r.venue)];
+  if(ak) bits.push(esc(ak)); if(r.wind!=null) bits.push("Wind "+fmtWind(r.wind)+(windy(r)?" (w)":"")); if(r.hand) bits.push("handgestoppt");
+  if(isChamp(r)) bits.push(esc(r.champ)); if(r.place) bits.push("Platz "+r.place);
+  $("chInfo").innerHTML=bits.join(" · ");
+}
+$("chart").addEventListener("pointerdown",e=>{const c=e.target.closest("circle.hit"); if(c) showPoint(+c.dataset.i);});
+$("chart").addEventListener("pointerover",e=>{const c=e.target.closest("circle.hit"); if(c&&e.pointerType==="mouse") showPoint(+c.dataset.i);});
+$("chDisc").addEventListener("change",()=>{ chDisc=$("chDisc").value; renderChart(); });
+let rsz=null; window.addEventListener("resize",()=>{ clearTimeout(rsz); rsz=setTimeout(()=>{ if(!$("chartBox").hidden&&!$("viewList").hidden) renderChart(); },150); });
 
 /* ---------- CSV ---------- */
 $("csv").addEventListener("click",async()=>{
   const q=v=>{const s=String(v==null?"":v); return /[;"\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
-  const rows=[["Athlet","Datum","Disziplin","Halle/Freiluft","Ergebnis","Einheit","Handzeit","Wind","Meisterschaft","Platz","Kommentar"]];
-  filtered().forEach(r=>rows.push([r.athleteId?aName(r.athleteId):"",LA.fmtDate(r.date),r.discipline,venueTxt(r.venue),r.mark,unit(r),r.hand?"ja":"",
+  const rows=[["Athlet","Altersklasse","Datum","Disziplin","Halle/Freiluft","Ergebnis","Einheit","Handzeit","Wind","Meisterschaft","Platz","Kommentar"]];
+  filtered().forEach(r=>rows.push([r.athleteId?aName(r.athleteId):"",akOf(r),LA.fmtDate(r.date),r.discipline,venueTxt(r.venue),r.mark,unit(r),r.hand?"ja":"",
     r.wind!=null?fmtWind(r.wind).replace("−","-"):"",r.champ||"",r.place||"",r.comment||""]));
   const csv="﻿"+rows.map(r=>r.map(q).join(";")).join("\r\n");
   const name="wettkampfergebnisse-"+new Date().toISOString().slice(0,10)+".csv";
@@ -438,8 +583,16 @@ function openForm(id){
   $("iChamp").value=r?r.champ||"":"";
   $("iPlace").value=r&&r.place?r.place:"";
   $("iComment").value=r?r.comment||"":"";
-  fillChampList(); syncForm();
+  fillChampList(); syncForm(); updAk();
 }
+function updAk(){
+  const a=ATH.find(x=>x.id===$("iAth").value), d=$("iDate").value;
+  const c=a&&/^\d{4}-\d{2}-\d{2}$/.test(d)?LA.ageClass(a,d):null;
+  $("akHint").textContent=c?"Altersklasse: "+c.label:(a&&!a.birthYear?"Ohne Jahrgang keine Altersklasse – in der Athletenverwaltung ergänzen.":"");
+}
+$("iAth").addEventListener("change",updAk);
+$("iDate").addEventListener("input",updAk);
+$("iDate").addEventListener("change",updAk);
 $("iDisc").addEventListener("change",()=>{ if($("iDisc").value===CUSTOM) $("iDiscName").focus(); syncForm(); });
 $("iVenue").addEventListener("click",e=>{const b=e.target.closest("button"); if(b){venue=b.dataset.v; syncForm();}});
 $("iKind").addEventListener("click",e=>{const b=e.target.closest("button"); if(b){kind=b.dataset.v; syncForm();}});
