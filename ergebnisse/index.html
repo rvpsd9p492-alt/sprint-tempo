@@ -123,7 +123,7 @@
     <button class="btn" id="csvImpBtn">CSV importieren</button>
     <input type="file" id="csvFile" accept=".csv,text/csv,text/plain" hidden>
   </div>
-  <p class="note" style="text-align:center">Import: gleiche Spalten wie der Export (Athlet; Datum; Disziplin; Halle/Freiluft; Ergebnis; Wind; Meisterschaft; International; Platz; Kommentar …). Pflicht sind Datum, Disziplin und Ergebnis. Unbekannte Athleten werden angelegt, doppelte Ergebnisse übersprungen.</p>
+  <p class="note" style="text-align:center">Import: gleiche Spalten wie der Export (Athlet; Datum; Disziplin; Halle/Freiluft; Ergebnis; Wind; Sportfest; Meisterschaft; International; Platz; Kommentar …). Pflicht sind Datum, Disziplin und Ergebnis. Unbekannte Athleten werden angelegt, doppelte Ergebnisse übersprungen.</p>
   <p class="note" id="csvMsg" style="text-align:center"></p>
 
   <p class="foot">Version <span id="ver"></span> · <span id="offState">Offline-Modus wird vorbereitet …</span></p>
@@ -188,7 +188,11 @@
   </section>
 
   <section>
-    <label class="fl" for="iChampSel" style="margin-top:0">Meisterschaft</label>
+    <label class="fl" for="iMeet" style="margin-top:0">Sportfest</label>
+    <input type="text" id="iMeet" list="meetList" maxlength="100" placeholder="z. B. Abendsportfest Pfungstadt" autocomplete="off">
+    <datalist id="meetList"></datalist>
+
+    <label class="fl" for="iChampSel">Meisterschaft</label>
     <select id="iChampSel"></select>
     <div id="champNewBox" hidden>
       <label class="fl" for="iChamp">Name der neuen Meisterschaft</label>
@@ -382,6 +386,7 @@ function renderList(){
       +(isChamp(r)?'<span class="badge champ">'+esc(r.champ)+"</span>":"")+"</div>"
       +'<div class="mid"><span class="disc">'+esc(r.discipline)+'</span><span class="mark">'+esc(r.mark)+(unit(r)?"<small>"+unit(r)+"</small>":"")+"</span></div>"
       +(bits.length?'<div class="bot">'+bits.join('<span class="sep">·</span>')+"</div>":"")
+      +(r.meet?'<div class="cm">'+esc(r.meet)+"</div>":"")
       +(r.comment?'<div class="cm">'+esc(r.comment)+"</div>":"")
       +"</button>";
   });
@@ -424,7 +429,7 @@ $("csvFile").addEventListener("change",async e=>{
   const rows=LA.parseCSV(await LA.readTextFile(f));
   if(rows.length<2) return msg('<span class="warn">Datei leer oder ohne Datenzeilen.</span>');
   const H=LA.headerIndex(rows[0],{ath:["Athlet","Athletin","Name"],date:["Datum","Date"],disc:["Disziplin","Wettbewerb"],venue:["Halle/Freiluft","Halle Freiluft","Ort","Bahn"],
-    mark:["Ergebnis","Leistung","Zeit","Weite","Resultat"],unit:["Einheit"],hand:["Handzeit","Handgestoppt"],wind:["Wind","Wind (m/s)"],champ:["Meisterschaft"],
+    mark:["Ergebnis","Leistung","Zeit","Weite","Resultat"],unit:["Einheit"],hand:["Handzeit","Handgestoppt"],wind:["Wind","Wind (m/s)"],champ:["Meisterschaft"],meet:["Sportfest","Veranstaltung","Wettkampf","Meeting"],
     intl:["International","Int"],place:["Platz","Platzierung","Rang"],comment:["Kommentar","Bemerkung","Notiz"]});
   const miss=["date","disc","mark"].filter(k=>H[k]<0);
   if(miss.length) return msg('<span class="warn">In der ersten Zeile fehlen die Spalten: '+miss.map(k=>({date:"Datum",disc:"Disziplin",mark:"Ergebnis"})[k]).join(", ")+".</span>");
@@ -453,7 +458,7 @@ $("csvFile").addEventListener("change",async e=>{
     else if(ATH.length===1) athleteId=ATH[0].id;
     let champ=cell(r,"champ"); champ=champ?(LA.championships(R).find(c=>c.toLowerCase()===champ.toLowerCase())||champ):"";
     const rec={id:LA.newId("r"),athleteId,date,discipline:(DISC.has(disc)?disc:(known?known.discipline:disc)),kind,venue,mark:m.mark,value:m.value,wind,
-      hand:kind==="t"&&m.value!=null&&yes(cell(r,"hand")),champ,intl:yes(cell(r,"intl"))||LA.INTL_CHAMPS.includes(champ),
+      hand:kind==="t"&&m.value!=null&&yes(cell(r,"hand")),meet:normMeet(cell(r,"meet")).slice(0,100),champ,intl:yes(cell(r,"intl"))||LA.INTL_CHAMPS.includes(champ),
       place:pRaw?+pRaw:null,comment:cell(r,"comment").slice(0,1000),createdAt:now,updatedAt:now};
     if(seen.has(key(rec))){ dup++; return; }
     seen.add(key(rec)); out.push(rec);
@@ -565,7 +570,7 @@ function showPoint(i){
   if(i==null||!chPts[i]){ $("chInfo").innerHTML='<span style="color:var(--muted)">Punkt antippen für Details.</span>'; return; }
   const r=chPts[i], ak=akOf(r), bits=[LA.fmtDate(r.date),"<b>"+esc(r.mark)+" "+unit(r)+"</b>",venueTxt(r.venue)];
   if(ak) bits.push(esc(ak)); if(r.wind!=null) bits.push("Wind "+fmtWind(r.wind)+(windy(r)?" (w)":"")); if(r.hand) bits.push("handgestoppt");
-  if(isChamp(r)) bits.push(esc(r.champ)); if(r.place) bits.push("Platz "+r.place);
+  if(r.meet) bits.push(esc(r.meet)); if(isChamp(r)) bits.push(esc(r.champ)); if(r.place) bits.push("Platz "+r.place);
   $("chInfo").innerHTML=bits.join(" · ");
 }
 $("chart").addEventListener("pointerdown",e=>{const c=e.target.closest("circle.hit"); if(c) showPoint(+c.dataset.i);});
@@ -575,9 +580,9 @@ let rsz=null; window.addEventListener("resize",()=>{ clearTimeout(rsz); rsz=setT
 
 /* ---------- CSV ---------- */
 $("csv").addEventListener("click",async()=>{
-  const rows=[["Athlet","Altersklasse","Datum","Disziplin","Halle/Freiluft","Ergebnis","Einheit","Handzeit","Wind","Meisterschaft","International","Platz","Kommentar"]];
+  const rows=[["Athlet","Altersklasse","Datum","Disziplin","Halle/Freiluft","Ergebnis","Einheit","Handzeit","Wind","Sportfest","Meisterschaft","International","Platz","Kommentar"]];
   filtered().forEach(r=>rows.push([r.athleteId?aName(r.athleteId):"",akOf(r),LA.fmtDate(r.date),r.discipline,venueTxt(r.venue),r.mark,unit(r),r.hand?"ja":"",
-    r.wind!=null?fmtWind(r.wind).replace("−","-"):"",r.champ||"",r.intl?"ja":"",r.place||"",r.comment||""]));
+    r.wind!=null?fmtWind(r.wind).replace("−","-"):"",r.meet||"",r.champ||"",r.intl?"ja":"",r.place||"",r.comment||""]));
   const csv=LA.toCSV(rows);
   const name="wettkampfergebnisse-"+new Date().toISOString().slice(0,10)+".csv";
   const res=await LA.shareOrDownload(name,"text/csv",csv);
@@ -616,6 +621,9 @@ function syncForm(){
   $("iWindSign").textContent=windSign<0?"−":"+";
   $("iWindSign").setAttribute("aria-label","Vorzeichen umschalten: "+(windSign<0?"minus":"plus"));
 }
+/** Bisher verwendete Sportfeste (für Vorschläge und einheitliche Schreibweise). */
+const meets=()=>[...new Set(R.map(r=>String(r.meet||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"de"));
+const normMeet=v=>{ const t=String(v||"").trim().replace(/\s+/g," "); return t?(meets().find(m=>m.toLowerCase()===t.toLowerCase())||t):""; };
 function fillChampSelect(sel){
   $("iChampSel").innerHTML=opt("","– keine Meisterschaft –",sel)+LA.championships(R).map(c=>opt(c,c,sel)).join("")+opt("__new","Andere …",sel);
   $("champNewBox").hidden=$("iChampSel").value!=="__new";
@@ -649,6 +657,8 @@ function openForm(id){
   windSign=r&&r.wind!=null&&r.wind<0?-1:1;
   $("iWind").value=r&&r.wind!=null?Math.abs(r.wind).toFixed(1).replace(".",","):"";
   $("iChamp").value=""; $("iIntl").checked=!!(r&&r.intl);
+  $("iMeet").value=r?r.meet||"":"";
+  $("meetList").innerHTML=meets().map(m=>'<option value="'+esc(m)+'">').join("");
   $("iPlace").value=r&&r.place?r.place:"";
   $("iComment").value=r?r.comment||"":"";
   fillChampSelect(r?(r.champ||"").trim():""); syncForm(); updAk();
@@ -690,7 +700,7 @@ $("form").addEventListener("submit",e=>{
   if(pRaw&&!/^\d{1,4}$/.test(pRaw)) return err("Platzierung als Zahl, z. B. 3.");
   const now=new Date().toISOString();
   const rec={athleteId,date,discipline:d.name,kind:d.kind,venue,mark:m.mark,value:m.value,wind,hand:d.kind==="t"&&m.value!=null&&$("iHand").checked,
-    champ,intl:$("iIntl").checked,place:pRaw?+pRaw:null,comment:$("iComment").value.trim(),updatedAt:now};
+    meet:normMeet($("iMeet").value),champ,intl:$("iIntl").checked,place:pRaw?+pRaw:null,comment:$("iComment").value.trim(),updatedAt:now};
   if(editId){ Object.assign(R.find(x=>x.id===editId),rec); }
   else R.push(Object.assign({id:"r"+Date.now().toString(36)+Math.random().toString(36).slice(2,7),createdAt:now},rec));
   persist();

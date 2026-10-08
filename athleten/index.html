@@ -119,7 +119,7 @@ function titleHtml(a,res){
   return '<div class="tit"><h3>Titel &amp; Medaillen<span>'+sum+"</span></h3>"+t.map(r=>{
     const c=LA.ageClass(a,r.date,!!r.intl);
     return '<div class="tl"><span class="md" aria-label="Platz '+r.place+'">'+MEDAL[r.place]+'</span><span class="tx">'+esc(r.champ.trim())+" · "+esc(r.discipline)
-      +'<br><span class="sm">'+r.date.slice(0,4)+(c?" · "+esc(c.label):"")+" · "+(r.venue==="indoor"?"Halle":"Freiluft")+" · "+esc(r.mark)+" "+LA.markUnit(r)+"</span></span></div>";
+      +'<br><span class="sm">'+r.date.slice(0,4)+(r.meet?" · "+esc(r.meet):"")+(c?" · "+esc(c.label):"")+" · "+(r.venue==="indoor"?"Halle":"Freiluft")+" · "+esc(r.mark)+" "+LA.markUnit(r)+"</span></span></div>";
   }).join("")+"</div>";
 }
 function renderList(){
