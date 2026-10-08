@@ -25,6 +25,7 @@
 .ath .pbl .m{font:700 17px "Barlow Condensed",sans-serif;text-align:right;white-space:nowrap;padding-left:8px}
 .ath .pbl .dt{color:var(--muted);text-align:right;white-space:nowrap;padding-left:10px;width:1%}
 .ath .none{font-size:14px;color:var(--muted);margin-top:4px}
+.ath .miss{font-size:14px;font-weight:600;color:var(--warn);margin-top:6px}
 .ath .tit{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
 .ath .tit h3{font:600 15px "Barlow Condensed",sans-serif;margin:0 0 4px;display:flex;justify-content:space-between;color:var(--ink)}
 .ath .tit h3 span{font:500 14px "Barlow",sans-serif;color:var(--muted)}
@@ -73,7 +74,7 @@
           <input type="text" id="iYear" inputmode="numeric" maxlength="4" placeholder="z. B. 2008">
         </div>
         <div>
-          <span class="fl">Geschlecht</span>
+          <span class="fl">Geschlecht (Pflicht)</span>
           <div class="seg" id="iSex" role="group" aria-label="Geschlecht">
             <button type="button" data-v="m">männlich</button>
             <button type="button" data-v="w">weiblich</button>
@@ -107,7 +108,7 @@ function syncSex(){
   [...$("iSex").querySelectorAll("button")].forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===sex)));
   const bd=$("iBirth").value; if(bd&&LA.isIsoDate(bd)) $("iYear").value=bd.slice(0,4);
   const y=$("iYear").value.trim(), c=/^\d{4}$/.test(y)?LA.ageClass({birthYear:+y,sex},new Date().toISOString().slice(0,10)):null;
-  $("akInfo").textContent=c?"Altersklasse "+new Date().getFullYear()+": "+c.label+(sex?"":" (Geschlecht angeben für M-/W-Klassen)")
+  $("akInfo").textContent=c?"Altersklasse "+new Date().getFullYear()+": "+c.label+(sex?"":" – Geschlecht wählen für M-/W-Klasse")
     :"Mit Jahrgang und Geschlecht werden die Altersklassen (z. B. M45) automatisch berechnet.";
 }
 
@@ -145,6 +146,7 @@ function renderList(){
       :(n?'<div class="none">Keine gültigen Bestleistungen</div>':'<div class="none">Noch keine Wettkampfergebnisse</div>');
     return '<button class="ath" data-id="'+esc(a.id)+'"><div class="nm"><b>'+esc(a.name)+"</b><span>"
       +(a.birthYear?"Jg. "+a.birthYear+" · ":"")+(cur?esc(cur.label)+" · ":"")+LA.plural(n,"Ergebnis","Ergebnisse")+"</span></div>"
+      +(a.sex?"":'<div class="miss">Geschlecht fehlt – tippen zum Ergänzen (für M-/W-Altersklassen)</div>')
       +pbTxt+titleHtml(a,res)+"</button>";
   }).join("");
 }
@@ -205,6 +207,7 @@ $("form").addEventListener("submit",e=>{
   e.preventDefault();
   const name=$("iName").value.trim(), y=$("iYear").value.trim();
   if(!name){ $("formErr").textContent="Name fehlt."; return; }
+  if(!sex){ $("formErr").textContent="Bitte Geschlecht wählen – daraus ergeben sich die Altersklassen (z. B. M45, W35)."; return; }
   const list=LA.athletes();
   if(list.some(a=>a.id!==editId&&a.name.toLowerCase()===name.toLowerCase())){ $("formErr").textContent="Es gibt bereits einen Athleten mit diesem Namen."; return; }
   const yr=y?+y:null, now=new Date().getFullYear();

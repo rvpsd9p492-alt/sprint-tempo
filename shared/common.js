@@ -418,5 +418,5 @@
     CHAMPIONSHIPS, INTL_CHAMPS, champRank, championships, titles, readTextFile, parseCSV, toCSV, headerIndex, parseDate,
     autoPBs, effectivePBs, setManual, resetToRecorded,
     backupStatus, exportBackup, parseBackup, applyBackup, shareOrDownload,
-    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.7" };
+    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.8" };
 })();
