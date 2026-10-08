@@ -38,7 +38,10 @@ h3{font:600 17px "Barlow Condensed",sans-serif;margin:16px 0 6px;color:var(--mut
 h3:first-of-type{margin-top:4px}
 .cloudst{display:flex;align-items:center;gap:8px;font-size:15px}
 .dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex:0 0 10px}
-.dot.ok{background:var(--ok)}.dot.busy{background:var(--signal)}.dot.err{background:var(--warn)}
+.dot.ok{background:var(--ok)}
+.store-bar{height:6px;border-radius:3px;background:var(--grid);margin-top:14px;overflow:hidden}
+.store-bar i{display:block;height:100%;width:0;min-width:2px;background:var(--track);border-radius:3px}
+.store-bar.high i{background:var(--warn)}.dot.busy{background:var(--signal)}.dot.err{background:var(--warn)}
 </style>
 </head>
 <body>
@@ -127,6 +130,10 @@ h3:first-of-type{margin-top:4px}
         <div class="row" style="margin-top:12px">
           <button class="btn primary" id="cSync">Jetzt synchronisieren</button>
           <button class="btn" id="cOut">Abmelden</button>
+        </div>
+        <div id="cStore" hidden>
+          <div class="store-bar" role="img" id="cStoreBar"><i id="cStoreFill"></i></div>
+          <p class="note" id="cStoreTxt" style="margin-top:6px"></p>
         </div>
         <button class="link" id="cPwChg" style="margin-top:8px">Passwort ändern</button>
         <div id="pwChg" hidden>
@@ -219,6 +226,17 @@ function renderCloud(x){
   else if(x.lastSyncAt){ dot.className="dot ok"; $("cState").textContent="Alles in der Cloud gesichert"; }
   else { dot.className="dot"; $("cState").textContent="Noch nicht synchronisiert"; }
   $("cWho").textContent="Angemeldet als "+x.email+(x.lastSyncAt?" · zuletzt synchronisiert "+fmtTs(x.lastSyncAt):"");
+  const st=x.storage; $("cStore").hidden=!st;
+  if(st){
+    const pct=st.db_bytes/st.limit*100, n=v=>v.toLocaleString("de-DE",{maximumFractionDigits:1});
+    const sz=b=>b<1024?b+" B":b<1048576?n(b/1024)+" kB":n(b/1048576)+" MB";
+    $("cStoreFill").style.width=Math.min(100,pct).toFixed(2)+"%";
+    $("cStoreBar").classList.toggle("high",pct>=80);
+    $("cStoreBar").setAttribute("aria-label","Datenbank zu "+n(pct)+" Prozent belegt");
+    $("cStoreTxt").innerHTML="Speicher bei Supabase: <b>"+sz(st.db_bytes)+" von "+sz(st.limit)+"</b> belegt ("+(pct<1?"unter 1":n(pct))+" %)"
+      +"<br>Davon deine Daten: "+sz(st.own_bytes)+" ("+LA.plural(st.own_rows,"Eintrag","Einträge")+") – den Rest belegt Supabase selbst."
+      +(pct>=80?'<br><span class="warn">Fast voll – bitte melden.</span>':"");
+  }
   $("cSync").disabled=x.syncing;
 }
 async function auth(fn){

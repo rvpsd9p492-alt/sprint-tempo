@@ -10,6 +10,8 @@
   const K = LA.KEYS;
   const OVERLAP_MS = 5 * 60 * 1000; // Puffer beim Abholen gegen knapp verpasste Änderungen
   const PAGE = 1000;
+  // Datenbank-Limit des Supabase-Tarifs (Free: 500 MB) – über LA_CLOUD.dbLimitMB anpassbar
+  const DB_LIMIT = (Number(CFG.dbLimitMB) > 0 ? Number(CFG.dbLimitMB) : 500) * 1024 * 1024;
 
   /* ---------- Zustand ---------- */
   // { session:{access_token,refresh_token,expires_at,user_id,email}, cursor, lastSyncAt, pushed:{ "kind:id": ms },
@@ -40,6 +42,7 @@
     const s = st(), loggedIn = !!(s.session && s.session.refresh_token);
     const p = loggedIn ? pending() : 0;
     return { configured, loggedIn, email: loggedIn ? s.session.email : null, syncing, pending: p,
+      storage: loggedIn && s.storage ? Object.assign({ limit: DB_LIMIT }, s.storage) : null,
       lastSyncAt: s.lastSyncAt || null, error: s.error || null,
       clean: loggedIn && p === 0 && !!s.lastSyncAt && !s.error };
   }
@@ -113,6 +116,22 @@
     if (d && d.access_token) { storeSession(d); emit(); await sync({ force: true }); return { confirmed: true }; }
     return { confirmed: false }; // Bestätigungs-Mail verschickt
   }
+  /* ---------- Speicherbelegung ---------- */
+  /** Fragt die Belegung ab (Funktion la_storage_info in Supabase): eigene Daten + Datenbank gesamt. */
+  async function storageInfo() {
+    const sess = await token();
+    const d = await http("/rest/v1/rpc/la_storage_info", { method: "POST", token: sess.access_token, body: {} });
+    const s = st();
+    s.storage = { own_bytes: +d.own_bytes || 0, own_rows: +d.own_rows || 0, db_bytes: +d.db_bytes || 0, at: new Date().toISOString() };
+    put(s); emit();
+    return s.storage;
+  }
+  function refreshStorage(force) {
+    const s = st();
+    if (!force && s.storage && Date.now() - ms(s.storage.at) < 5 * 60 * 1000) return;
+    storageInfo().catch(() => {}); // ältere Datenbank ohne Funktion oder offline: Anzeige entfällt
+  }
+
   /* ---------- Passwort ---------- */
   /** Schickt eine E-Mail mit Link zum Zurücksetzen (öffnet die Übersichtsseite mit #…type=recovery). */
   async function requestPasswordReset(email) {
@@ -277,6 +296,7 @@
       await push(sess, s);
       s.lastSyncAt = new Date().toISOString(); s.error = null;
       put(s);
+      refreshStorage(opts && opts.force);
     } catch (e) {
       const s = st();
       s.error = e.code === "offline" ? null : (e.message || "Synchronisierung fehlgeschlagen.");
@@ -304,5 +324,5 @@
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") schedule(300); });
   if (configured) setTimeout(() => sync(), 300);
 
-  LA.cloud = { configured, status, signIn, signUp, signOut, sync, requestPasswordReset, readRecoveryLink, updatePassword, onStatus: (fn) => { listeners.add(fn); return () => listeners.delete(fn); } };
+  LA.cloud = { configured, status, signIn, signUp, signOut, sync, storageInfo, requestPasswordReset, readRecoveryLink, updatePassword, onStatus: (fn) => { listeners.add(fn); return () => listeners.delete(fn); } };
 })();
