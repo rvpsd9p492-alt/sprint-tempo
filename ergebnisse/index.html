@@ -123,6 +123,7 @@
     <button class="btn" id="csvImpBtn">CSV importieren</button>
     <input type="file" id="csvFile" accept=".csv,text/csv,text/plain" hidden>
   </div>
+  <section id="impBox" hidden></section>
   <p class="note" style="text-align:center">Import: gleiche Spalten wie der Export (Athlet; Datum; Disziplin; Halle/Freiluft; Ergebnis; Wind; Sportfest; Meisterschaft; International; Platz; Kommentar …). Pflicht sind Datum, Disziplin und Ergebnis. Unbekannte Athleten werden angelegt, doppelte Ergebnisse übersprungen.</p>
   <p class="note" id="csvMsg" style="text-align:center"></p>
 
@@ -425,54 +426,75 @@ $("bkBtn").addEventListener("click",async()=>{const r=await LA.exportBackup(); i
 $("csvImpBtn").addEventListener("click",()=>$("csvFile").click());
 $("csvFile").addEventListener("change",async e=>{
   const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f) return;
-  const msg=h=>{$("csvMsg").innerHTML=h;}, list=errs=>errs.length?"<br>"+errs.slice(0,10).map(esc).join("<br>")+(errs.length>10?"<br>… "+(errs.length-10)+" weitere":""):"";
+  const msg=h=>{$("csvMsg").innerHTML=h;};
+  msg("");
   const rows=LA.parseCSV(await LA.readTextFile(f));
-  if(rows.length<2) return msg('<span class="warn">Datei leer oder ohne Datenzeilen.</span>');
-  const H=LA.headerIndex(rows[0],{ath:["Athlet","Athletin","Name"],date:["Datum","Date"],disc:["Disziplin","Wettbewerb"],venue:["Halle/Freiluft","Halle Freiluft","Ort","Bahn"],
+  if(rows.length<2) return msg('<span class="warn">„'+esc(f.name)+'“ ist leer oder hat nur eine Überschriftszeile.</span>');
+  const header=rows[0], data=rows.slice(1);
+  const H=LA.headerIndex(header,{ath:["Athlet","Athletin","Name"],date:["Datum","Date"],disc:["Disziplin","Wettbewerb"],venue:["Halle/Freiluft","Halle Freiluft","Ort","Bahn"],
     mark:["Ergebnis","Leistung","Zeit","Weite","Resultat"],unit:["Einheit"],hand:["Handzeit","Handgestoppt"],wind:["Wind","Wind (m/s)"],champ:["Meisterschaft"],meet:["Sportfest","Veranstaltung","Wettkampf","Meeting"],
     intl:["International","Int"],place:["Platz","Platzierung","Rang"],comment:["Kommentar","Bemerkung","Notiz"]});
   const miss=["date","disc","mark"].filter(k=>H[k]<0);
-  if(miss.length) return msg('<span class="warn">In der ersten Zeile fehlen die Spalten: '+miss.map(k=>({date:"Datum",disc:"Disziplin",mark:"Ergebnis"})[k]).join(", ")+".</span>");
+  if(miss.length) return msg('<span class="warn">In der Überschriftszeile fehlen die Spalten: '+miss.map(k=>({date:"Datum",disc:"Disziplin",mark:"Ergebnis"})[k]).join(", ")
+    +".</span><br>Gefunden: "+header.map(h=>"„"+esc(h)+"“").join(", ")+(header.length===1?"<br>Nur eine Spalte erkannt – Trennzeichen bitte Semikolon (;) oder Komma.":""));
+  const usedIdx=Object.values(H).filter(i=>i>=0), colNotes={};
+  header.forEach((h,i)=>{ if(/^alters?klasse$|^ak$/i.test(h.trim())) colNotes[i]="wird automatisch berechnet"; });
   const cell=(r,k)=>H[k]>=0?String(r[H[k]]||"").trim():"";
   const yes=v=>/^(ja|j|x|1|true|yes|y)$/i.test(v);
-  const athByName=new Map(ATH.map(a=>[a.name.toLowerCase(),a])), newAth=new Map();
+  const athByName=new Map(ATH.map(a=>[a.name.toLowerCase(),a])), newAth=new Map(), newAthLines=new Map();
   const key=r=>(r.athleteId||"")+"|"+r.date+"|"+r.discipline+"|"+r.mark;
-  const seen=new Set(R.map(key)), out=[], errs=[]; let dup=0;
+  const seen=new Map(R.map(r=>[key(r),r])), out=[], problems=LA.columnCountWarnings(header,data);
   const now=new Date().toISOString();
-  rows.slice(1).forEach((r,i)=>{
-    const ln="Zeile "+(i+2)+": ";
-    const date=LA.parseDate(cell(r,"date")); if(!date) return errs.push(ln+"Datum „"+cell(r,"date")+"“ unlesbar");
-    const disc=cell(r,"disc"); if(!disc) return errs.push(ln+"Disziplin fehlt");
-    const known=DISC.get(disc)||R.find(x=>x.discipline===disc), u=cell(r,"unit").toLowerCase(), rawMark=cell(r,"mark");
+  data.forEach((r,i)=>{
+    const line=i+2, bad=[], warn=[];
+    const dRaw=cell(r,"date"), date=LA.parseDate(dRaw);
+    if(!dRaw) bad.push("Datum fehlt"); else if(!date) bad.push("Datum „"+dRaw+"“ ist kein gültiges Datum (erwartet z. B. 12.06.2026)");
+    const disc=cell(r,"disc"); if(!disc) bad.push("Disziplin fehlt");
+    const known=disc?(DISC.get(disc)||R.find(x=>x.discipline===disc)):null, u=cell(r,"unit").toLowerCase(), rawMark=cell(r,"mark");
     const kind=known?known.kind:/^(s|sek|min|h)$/.test(u)||rawMark.includes(":")?"t":/^m$/.test(u)?"d":/^(pkt\.?|punkte)$/.test(u)?"p":null;
-    if(!kind) return errs.push(ln+"Wertung für „"+disc+"“ unbekannt – Spalte „Einheit“ (s, m oder Pkt.) angeben");
-    const m=parseMark(rawMark,kind); if(m.err) return errs.push(ln+m.err);
+    if(disc&&!kind) bad.push("Disziplin „"+disc+"“ ist nicht in der Liste, daher ist unklar, ob Zeit, Weite oder Punkte – Spalte „Einheit“ mit s, m oder Pkt. füllen");
+    let m=null;
+    if(!rawMark) bad.push("Ergebnis fehlt");
+    else if(kind){ m=parseMark(rawMark,kind); if(m.err) bad.push("Ergebnis „"+rawMark+"“: "+m.err); }
     const vRaw=cell(r,"venue").toLowerCase(), venue=/^(halle|h|indoor|i)/.test(vRaw)?"indoor":"outdoor";
+    if(vRaw&&!/^(halle|h|indoor|i|freiluft|f|outdoor|o|draußen|draussen|stadion)/.test(vRaw)) warn.push("Halle/Freiluft „"+cell(r,"venue")+"“ unbekannt – als Freiluft übernommen");
     let wind=null; const wRaw=cell(r,"wind");
-    if(wRaw){ const w=parseWind(wRaw,1); if(w.err) return errs.push(ln+w.err); wind=venue==="outdoor"?w.value:null; }
-    const pRaw=cell(r,"place").replace(/\.$/,""); if(pRaw&&!/^\d{1,4}$/.test(pRaw)) return errs.push(ln+"Platz „"+pRaw+"“ ist keine Zahl");
+    if(wRaw){ const w=parseWind(wRaw,1); if(w.err) bad.push("Wind „"+wRaw+"“: "+w.err); else if(venue==="outdoor") wind=w.value; else warn.push("Wind bei Hallenergebnis ignoriert"); }
+    const pRaw=cell(r,"place").replace(/\.$/,""); if(pRaw&&!/^\d{1,4}$/.test(pRaw)) bad.push("Platz „"+cell(r,"place")+"“ ist keine ganze Zahl");
+    if(bad.length){ problems.push({line,type:"error",reason:bad.join(" · "),raw:r}); return; }
     // Athlet: per Name zuordnen, Unbekannte anlegen; ohne Spalte bei nur einem Athleten diesen nehmen
     const an=cell(r,"ath"); let athleteId=null;
     if(an){ const k=an.toLowerCase(); let a=athByName.get(k)||newAth.get(k);
-      if(!a){ a={id:LA.newId("a"),name:an.slice(0,40),manual:{}}; newAth.set(k,a); } athleteId=a.id; }
+      if(!a){ a={id:LA.newId("a"),name:an.slice(0,40),manual:{}}; newAth.set(k,a); newAthLines.set(a.id,[]); }
+      if(newAthLines.has(a.id)) newAthLines.get(a.id).push(line);
+      athleteId=a.id; }
     else if(ATH.length===1) athleteId=ATH[0].id;
+    else warn.push("Spalte Athlet leer – Ergebnis wird ohne Athlet importiert (später zuordnen)");
     let champ=cell(r,"champ"); champ=champ?(LA.championships(R).find(c=>c.toLowerCase()===champ.toLowerCase())||champ):"";
     const rec={id:LA.newId("r"),athleteId,date,discipline:(DISC.has(disc)?disc:(known?known.discipline:disc)),kind,venue,mark:m.mark,value:m.value,wind,
       hand:kind==="t"&&m.value!=null&&yes(cell(r,"hand")),meet:normMeet(cell(r,"meet")).slice(0,100),champ,intl:yes(cell(r,"intl"))||LA.INTL_CHAMPS.includes(champ),
       place:pRaw?+pRaw:null,comment:cell(r,"comment").slice(0,1000),createdAt:now,updatedAt:now};
-    if(seen.has(key(rec))){ dup++; return; }
-    seen.add(key(rec)); out.push(rec);
+    const prev=seen.get(key(rec));
+    if(prev){
+      problems.push({line,type:"dup",raw:r,reason:prev._line?"gleiches Ergebnis wie Zeile "+prev._line
+        :"Ergebnis gibt es schon: "+[LA.athleteName(prev.athleteId,ATH)||"ohne Athlet",LA.fmtDate(prev.date),prev.discipline,prev.mark+" "+unit(prev)].join(", ")});
+      return;
+    }
+    warn.forEach(w=>problems.push({line,type:"warn",reason:w,raw:r}));
+    seen.set(key(rec),Object.assign({_line:line},rec)); out.push(rec);
   });
-  if(!out.length) return msg('<span class="warn">Keine neuen Ergebnisse'+(dup?" ("+LA.plural(dup,"Duplikat","Duplikate")+" übersprungen)":"")+".</span>"+list(errs));
   const usedNew=[...newAth.values()].filter(a=>out.some(r=>r.athleteId===a.id));
-  if(!confirm(LA.plural(out.length,"neues Ergebnis","neue Ergebnisse")+" importieren?"
-    +(usedNew.length?"\nNeu angelegt: "+usedNew.map(a=>a.name).join(", "):"")
-    +(dup?"\n"+LA.plural(dup,"Duplikat wird","Duplikate werden")+" übersprungen.":"")
-    +(errs.length?"\n"+LA.plural(errs.length,"fehlerhafte Zeile wird","fehlerhafte Zeilen werden")+" übersprungen.":""))) return;
-  usedNew.forEach(a=>LA.upsertAthlete(a)); ATH=LA.athletes();
-  R=R.concat(out); persist();
-  msg('<span class="ok">'+LA.plural(out.length,"Ergebnis","Ergebnisse")+" importiert"+(dup?", "+dup+" Duplikat(e) übersprungen":"")+".</span>"+list(errs));
-  renderList();
+  LA.importPreview({box:$("impBox"),fileName:f.name,header,rawRows:data,dataRows:data.length,usedIdx,colNotes,problems,
+    okCount:out.length,okLabel:["Ergebnis","Ergebnisse"],
+    extra:usedNew.length?"Neu angelegt werden: "+usedNew.map(a=>"<b>"+esc(a.name)+"</b> (Zeile "+newAthLines.get(a.id).join(", ")+")").join(", ")
+      +" – Namen prüfen: andere Schreibweise = anderer Athlet.":"",
+    onImport:()=>{
+      usedNew.forEach(a=>LA.upsertAthlete(a)); ATH=LA.athletes();
+      R=R.concat(out); persist();
+      const skipped=problems.filter(p=>p.type!=="warn").length;
+      msg('<span class="ok">'+LA.plural(out.length,"Ergebnis","Ergebnisse")+" importiert.</span>"+(skipped?" "+LA.plural(skipped,"Zeile","Zeilen")+" übersprungen.":""));
+      renderList();
+    }});
 });
 
 /* ---------- Leistungsentwicklung (SVG, ohne Bibliothek) ---------- */

@@ -78,3 +78,17 @@ details>summary::after{content:"+";float:right;font-weight:500}
 details[open]>summary::after{content:"–"}
 details .in{padding:0 16px 16px}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+/* Import-Vorschau */
+.impsum{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:15px;font-weight:600;margin:6px 0}
+.col{display:inline-block;font-size:12px;padding:1px 6px;border-radius:5px;border:1px solid var(--line);margin:2px 2px 0 0;color:var(--ink)}
+.col.off{border-style:dashed;color:var(--muted)}
+.impscroll{max-height:55vh;overflow:auto;margin-top:8px;border:1px solid var(--line);border-radius:10px}
+.imptab{width:100%;border-collapse:collapse;font-size:14px}
+.imptab th{position:sticky;top:0;background:var(--surface);text-align:left;font-weight:600;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line)}
+.imptab td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.imptab tr:last-child td{border-bottom:0}
+.imptab .ln{font-variant-numeric:tabular-nums;color:var(--muted);width:1%;white-space:nowrap}
+.imptab tr.t-error b{color:var(--warn)}
+.importing .fab{display:none}
+.imptab .raw{font-size:12px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}

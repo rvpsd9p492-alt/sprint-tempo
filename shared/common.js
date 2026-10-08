@@ -207,6 +207,61 @@
     Object.entries(aliases).forEach(([key, names]) => { out[key] = h.findIndex((x) => names.map(norm).includes(x)); });
     return out;
   }
+  /**
+   * Import-Vorschau: zeigt vor dem Import jede übersprungene Zeile mit Grund, erkannte/ignorierte Spalten
+   * und bietet die Fehlerzeilen als CSV (mit Spalte „Fehlergrund“) zum Korrigieren an.
+   * problems: [{ line, type: "error"|"dup"|"warn", reason, raw: [Zellen] }]
+   */
+  function importPreview(o) {
+    const box = o.box, e = esc;
+    const errs = o.problems.filter((p) => p.type === "error"), dups = o.problems.filter((p) => p.type === "dup"),
+      warns = o.problems.filter((p) => p.type === "warn");
+    const skipped = o.problems.filter((p) => p.type !== "warn");
+    const cols = o.header.map((h, i) => ({ h: h || "(ohne Überschrift)", used: o.usedIdx.includes(i), note: (o.colNotes || {})[i] }));
+    const rowsHtml = o.problems.slice().sort((a, b) => a.line - b.line || (b.type === "warn") - (a.type === "warn")).map((p) =>
+      '<tr class="t-' + p.type + '"><td class="ln">' + p.line + "</td><td><b>" + (p.type === "error" ? "Fehler" : p.type === "dup" ? "Doppelt" : "Hinweis")
+      + ":</b> " + e(p.reason) + '<div class="raw">' + e(p.raw.join(" ; ")) + "</div></td></tr>").join("");
+    box.innerHTML = "<h2>Import prüfen</h2>"
+      + '<p class="note" style="margin-top:0">' + e(o.fileName) + " · " + plural(o.dataRows, "Datenzeile", "Datenzeilen") + "</p>"
+      + '<div class="impsum"><span class="ok">✓ ' + plural(o.okCount, o.okLabel[0], o.okLabel[1]) + " werden importiert</span>"
+      + (dups.length ? "<span>↺ " + plural(dups.length, "Duplikat", "Duplikate") + " übersprungen</span>" : "")
+      + (errs.length ? '<span class="warn">✕ ' + plural(errs.length, "fehlerhafte Zeile", "fehlerhafte Zeilen") + " übersprungen</span>" : "")
+      + (warns.length ? "<span>! " + plural(warns.length, "Hinweis", "Hinweise") + "</span>" : "") + "</div>"
+      + '<p class="note">Spalten: ' + cols.map((c) => c.used ? '<span class="col">' + e(c.h) + "</span>"
+        : '<span class="col off">' + e(c.h) + " – " + e(c.note || "nicht erkannt, wird ignoriert") + "</span>").join(" ") + "</p>"
+      + (o.extra ? '<p class="note">' + o.extra + "</p>" : "")
+      + (rowsHtml ? '<div class="impscroll"><table class="imptab"><thead><tr><th>Zeile</th><th>Grund und Inhalt</th></tr></thead><tbody>' + rowsHtml + "</tbody></table></div>" : "")
+      + '<div class="row" style="margin-top:12px">'
+      + '<button class="btn primary" data-act="go"' + (o.okCount ? "" : " disabled") + ">" + (o.okCount ? plural(o.okCount, o.okLabel[0], o.okLabel[1]) + " importieren" : "Nichts zu importieren") + "</button>"
+      + '<button class="btn" data-act="cancel">Abbrechen</button>'
+      + (skipped.length ? '<button class="btn" data-act="errcsv">Fehlerliste als CSV</button>' : "") + "</div>";
+    box.hidden = false;
+    document.body.classList.add("importing"); // schwebende Knöpfe ausblenden
+    box.scrollIntoView({ behavior: "smooth", block: "start" });
+    box.onclick = async (ev) => {
+      const b = ev.target.closest("button[data-act]"); if (!b) return;
+      if (b.dataset.act === "cancel" || b.dataset.act === "go") { box.hidden = true; box.innerHTML = ""; document.body.classList.remove("importing"); }
+      if (b.dataset.act === "cancel") o.onCancel && o.onCancel();
+      if (b.dataset.act === "go") o.onImport();
+      if (b.dataset.act === "errcsv") {
+        const reasons = new Map();
+        skipped.forEach((p) => reasons.set(p.line, (reasons.has(p.line) ? reasons.get(p.line) + " | " : "") + p.reason));
+        const rows = [o.header.concat("Fehlergrund")].concat([...reasons.keys()].sort((a, b) => a - b)
+          .map((ln) => o.rawRows[ln - 2].concat(reasons.get(ln))));
+        await shareOrDownload(o.fileName.replace(/\.[^.]*$/, "") + "-fehler.csv", "text/csv", toCSV(rows));
+      }
+    };
+  }
+  /** Hinweis-Probleme für Zeilen mit abweichender Spaltenzahl (typisch: Semikolon im Text ohne Anführungszeichen). */
+  function columnCountWarnings(header, rows) {
+    const out = [];
+    rows.forEach((r, i) => {
+      if (r.length !== header.length) out.push({ line: i + 2, type: "warn", raw: r,
+        reason: "Zeile hat " + r.length + " statt " + header.length + " Spalten – steht ein Semikolon im Text? Dann den Text in Anführungszeichen setzen; Werte können verrutscht sein." });
+    });
+    return out;
+  }
+
   /** Datum aus 12.06.2026, 12.6.26, 2026-06-12 oder 12/06/2026 → JJJJ-MM-TT (oder null). */
   function parseDate(v) {
     const s = String(v || "").trim();
@@ -415,8 +470,8 @@
     athletes, saveAthletes, upsertAthlete, deleteAthlete, athleteName,
     results, saveResults, isWindy, isLegal,
     DISCIPLINE_GROUPS, DISC, discOrder, better, markUnit, bestMarks, ageClass, resultClass, isIsoDate, exactAge,
-    CHAMPIONSHIPS, INTL_CHAMPS, champRank, championships, titles, readTextFile, parseCSV, toCSV, headerIndex, parseDate,
+    CHAMPIONSHIPS, INTL_CHAMPS, champRank, championships, titles, readTextFile, parseCSV, toCSV, headerIndex, parseDate, importPreview, columnCountWarnings,
     autoPBs, effectivePBs, setManual, resetToRecorded,
     backupStatus, exportBackup, parseBackup, applyBackup, shareOrDownload,
-    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.8" };
+    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.9" };
 })();

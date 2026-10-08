@@ -58,6 +58,7 @@
     </div>
     <p class="note" id="csvMsg" aria-live="polite"></p>
   </section>
+  <section id="impBox" hidden></section>
   <p class="note" style="text-align:center">Bestleistungen je Altersklasse aus allen erfassten Wettkampfergebnissen – ohne Rückenwind über +2,0 m/s und ohne Handzeiten. „PB“ = Gesamt-Bestleistung.</p>
 </div>
 
@@ -160,30 +161,40 @@ $("csvExp").addEventListener("click",async()=>{
 $("csvImpBtn").addEventListener("click",()=>$("csvFile").click());
 $("csvFile").addEventListener("change",async e=>{
   const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f) return;
+  $("csvMsg").textContent="";
   const rows=LA.parseCSV(await LA.readTextFile(f));
-  if(rows.length<2){ $("csvMsg").innerHTML='<span class="warn">Datei leer oder ohne Datenzeilen.</span>'; return; }
-  const H=LA.headerIndex(rows[0],{name:["Name","Athlet","Athletin"],year:["Jahrgang","JG","Jahr"],birth:["Geburtsdatum","Geburtstag","Geb.-Datum","Geb"],sex:["Geschlecht","Sex"]});
-  if(H.name<0){ $("csvMsg").innerHTML='<span class="warn">Spalte „Name“ fehlt in der ersten Zeile.</span>'; return; }
-  const list=LA.athletes(), errs=[]; let add=0, upd=0; const changes=[];
-  rows.slice(1).forEach((r,i)=>{
-    const ln=i+2, name=(r[H.name]||"").trim(); if(!name){ errs.push("Zeile "+ln+": Name fehlt"); return; }
-    const yRaw=H.year>=0?(r[H.year]||"").trim():"", bRaw=H.birth>=0?(r[H.birth]||"").trim():"", sRaw=H.sex>=0?(r[H.sex]||"").trim().toLowerCase():"";
-    const bd=bRaw?LA.parseDate(bRaw):null; if(bRaw&&!bd){ errs.push("Zeile "+ln+": Geburtsdatum „"+bRaw+"“ unlesbar"); return; }
-    const yr=yRaw?+yRaw:null; if(yRaw&&!(/^\d{4}$/.test(yRaw)&&yr>=1920&&yr<=new Date().getFullYear())){ errs.push("Zeile "+ln+": Jahrgang „"+yRaw+"“ ungültig"); return; }
-    if(bd&&yr&&+bd.slice(0,4)!==yr){ errs.push("Zeile "+ln+": Jahrgang passt nicht zum Geburtsdatum"); return; }
-    const sx=/^(m|männlich|maennlich|mann|male)$/.test(sRaw)?"m":/^(w|weiblich|frau|female|f)$/.test(sRaw)?"w":null;
-    if(sRaw&&!sx){ errs.push("Zeile "+ln+": Geschlecht „"+sRaw+"“ unbekannt (m/w)"); return; }
-    const ex=list.find(a=>a.name.toLowerCase()===name.toLowerCase())||changes.find(a=>a.name.toLowerCase()===name.toLowerCase());
+  if(rows.length<2){ $("csvMsg").innerHTML='<span class="warn">„'+esc(f.name)+'“ ist leer oder hat nur eine Überschriftszeile.</span>'; return; }
+  const header=rows[0], data=rows.slice(1);
+  const H=LA.headerIndex(header,{name:["Name","Athlet","Athletin"],year:["Jahrgang","JG","Jahr"],birth:["Geburtsdatum","Geburtstag","Geb.-Datum","Geb"],sex:["Geschlecht","Sex"]});
+  if(H.name<0){ $("csvMsg").innerHTML='<span class="warn">Spalte „Name“ fehlt in der Überschriftszeile.</span><br>Gefunden: '+header.map(h=>"„"+esc(h)+"“").join(", "); return; }
+  const usedIdx=Object.values(H).filter(i=>i>=0);
+  const list=LA.athletes(), problems=LA.columnCountWarnings(header,data), changes=[], seenLine=new Map(); let add=0, upd=0;
+  data.forEach((r,i)=>{
+    const line=i+2, bad=[], name=(r[H.name]||"").trim();
+    if(!name) bad.push("Name fehlt");
+    const yRaw=H.year>=0?(r[H.year]||"").trim():"", bRaw=H.birth>=0?(r[H.birth]||"").trim():"", sRaw=H.sex>=0?(r[H.sex]||"").trim():"";
+    const bd=bRaw?LA.parseDate(bRaw):null; if(bRaw&&!bd) bad.push("Geburtsdatum „"+bRaw+"“ ist kein gültiges Datum (erwartet z. B. 20.11.1981)");
+    const yr=yRaw?+yRaw:null; if(yRaw&&!(/^\d{4}$/.test(yRaw)&&yr>=1920&&yr<=new Date().getFullYear())) bad.push("Jahrgang „"+yRaw+"“ ungültig (vierstellig, z. B. 1981)");
+    if(bd&&yr&&+bd.slice(0,4)!==yr) bad.push("Jahrgang "+yr+" passt nicht zum Geburtsdatum "+LA.fmtDate(bd));
+    const sl=sRaw.toLowerCase(), sx=/^(m|männlich|maennlich|mann|male)$/.test(sl)?"m":/^(w|weiblich|frau|female|f)$/.test(sl)?"w":null;
+    if(sRaw&&!sx) bad.push("Geschlecht „"+sRaw+"“ unbekannt (erlaubt: m oder w)");
+    if(bad.length){ problems.push({line,type:"error",reason:bad.join(" · "),raw:r}); return; }
+    const k=name.toLowerCase();
+    if(seenLine.has(k)) problems.push({line,type:"warn",raw:r,reason:"Name kommt schon in Zeile "+seenLine.get(k)+" vor – Angaben werden zusammengeführt"});
+    else seenLine.set(k,line);
+    const ex=list.find(a=>a.name.toLowerCase()===k)||changes.find(a=>a.name.toLowerCase()===k);
     const a=ex||{id:LA.newId("a"),name,manual:{}};
     if(bd){ a.birthDate=bd; a.birthYear=+bd.slice(0,4); } else if(yr){ a.birthYear=yr; if(a.birthDate&&+a.birthDate.slice(0,4)!==yr) a.birthDate=null; }
     if(sx) a.sex=sx;
-    if(!changes.includes(a)){ changes.push(a); list.includes(a)?upd++:add++; }
+    if(!changes.includes(a)){ changes.push(a); a._line=line; a._raw=r; list.includes(a)?upd++:add++; }
   });
-  if(!changes.length){ $("csvMsg").innerHTML='<span class="warn">Nichts zu importieren.</span>'+(errs.length?"<br>"+errs.slice(0,8).map(LA.esc).join("<br>"):""); return; }
-  if(!confirm(LA.plural(add,"neuer Athlet","neue Athleten")+", "+LA.plural(upd,"Athlet wird","Athleten werden")+" ergänzt"+(errs.length?", "+LA.plural(errs.length,"Zeile","Zeilen")+" fehlerhaft (werden übersprungen)":"")+". Importieren?")) return;
-  changes.forEach(a=>LA.upsertAthlete(a));
-  $("csvMsg").innerHTML='<span class="ok">Importiert: '+add+" neu, "+upd+" ergänzt.</span>"+(errs.length?"<br>"+errs.slice(0,8).map(LA.esc).join("<br>")+(errs.length>8?"<br>…":""):"");
-  renderList();
+  // erst nach dem Zusammenführen aller Zeilen prüfen (eine spätere Zeile kann das Geschlecht nachliefern)
+  changes.forEach(a=>{ if(!a.sex) problems.push({line:a._line,type:"warn",raw:a._raw,reason:"Kein Geschlecht – Altersklasse ohne M/W, bitte später ergänzen"}); delete a._line; delete a._raw; });
+  LA.importPreview({box:$("impBox"),fileName:f.name,header,rawRows:data,dataRows:data.length,usedIdx,problems,
+    okCount:changes.length,okLabel:["Athlet","Athleten"],
+    extra:(add?LA.plural(add,"neuer Athlet","neue Athleten"):"")+(add&&upd?", ":"")+(upd?LA.plural(upd,"vorhandener wird","vorhandene werden")+" ergänzt (gleicher Name)":""),
+    onImport:()=>{ changes.forEach(a=>LA.upsertAthlete(a));
+      $("csvMsg").innerHTML='<span class="ok">Importiert: '+add+" neu, "+upd+" ergänzt.</span>"; renderList(); }});
 });
 $("list").addEventListener("click",e=>{const b=e.target.closest(".ath"); if(b) location.hash="#bearbeiten/"+encodeURIComponent(b.dataset.id);});
 
