@@ -113,6 +113,38 @@
   const DISC = new Map();
   DISCIPLINE_GROUPS.forEach(([, list]) => list.forEach(([n, k, w]) => DISC.set(n, { kind: k, wind: !!w, order: DISC.size })));
   const discOrder = (name) => (DISC.has(name) ? DISC.get(name).order : 1000);
+  // Kurzformen aus Listen/Excel → Name der Disziplinliste
+  const DISC_ALIASES = { kugel: "Kugelstoß", kugelstossen: "Kugelstoß", speer: "Speerwurf", diskus: "Diskuswurf", hammer: "Hammerwurf",
+    ball: "Ballwurf", weit: "Weitsprung", hoch: "Hochsprung", drei: "Dreisprung", stab: "Stabhochsprung", stabhoch: "Stabhochsprung",
+    hm: "Halbmarathon", "10kmstrasse": "10 km Straße", "10km": "10 km Straße" };
+  /** Vereinheitlicht Disziplinnamen: "60", "60m" → "60 m"; "4x100" → "4×100 m"; "60mH" → "60 m Hürden"; "Kugel" → "Kugelstoß". */
+  function normalizeDiscipline(raw) {
+    const s = String(raw == null ? "" : raw).trim().replace(/\s+/g, " ");
+    if (!s || DISC.has(s)) return s;
+    const fold = (x) => x.toLowerCase().replace(/ß/g, "ss").replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue");
+    const low = fold(s);
+    for (const n of DISC.keys()) if (fold(n) === low) return n;
+    const c = low.replace(/[\s.]/g, "");
+    let m;
+    if ((m = c.match(/^(\d)[x×*](\d{2,4})m?$/))) return m[1] + "×" + m[2] + " m";
+    if ((m = c.match(/^(\d{2,3})m?(h|hue|huerden)$/)) && DISC.has(m[1] + " m Hürden")) return m[1] + " m Hürden";
+    if ((m = c.match(/^(\d{4})m?(hi|hind|hindernis)$/)) && DISC.has(m[1] + " m Hindernis")) return m[1] + " m Hindernis";
+    if ((m = c.match(/^(\d{2,5})m?$/))) { const v = +m[1]; return (v >= 10000 ? v.toLocaleString("de-DE") : String(v)) + " m"; }
+    if (DISC_ALIASES[c]) return DISC_ALIASES[c];
+    return s;
+  }
+  /** Korrigiert gespeicherte Ergebnisse mit Kurzform-Disziplinen (einmalig je Eintrag; Cloud übernimmt die Änderung). */
+  function normalizeStoredDisciplines() {
+    const res = load(KEYS.results, []);
+    if (!Array.isArray(res)) return 0;
+    const now = new Date().toISOString(); let n = 0;
+    res.forEach((r) => {
+      const d = normalizeDiscipline(r.discipline);
+      if (d && d !== r.discipline) { r.discipline = d; if (DISC.has(d)) r.kind = DISC.get(d).kind; r.updatedAt = now; n++; }
+    });
+    if (n) save(KEYS.results, res);
+    return n;
+  }
   const better = (kind, a, b) => (kind === "t" ? a < b : a > b);
   /** Einheit eines Ergebnisses: s, min, h, m oder Pkt. */
   function markUnit(r) {
@@ -465,13 +497,14 @@
   }
 
   migrate();
+  normalizeStoredDisciplines();
 
   window.LA = { KEYS, SPRINT, SPRINT_DISTS, PB_MONTHS, load, save, newId, trackDelete, hash, tempoSettings, TEMPO_SETTINGS,
     athletes, saveAthletes, upsertAthlete, deleteAthlete, athleteName,
     results, saveResults, isWindy, isLegal,
-    DISCIPLINE_GROUPS, DISC, discOrder, better, markUnit, bestMarks, ageClass, resultClass, isIsoDate, exactAge,
+    DISCIPLINE_GROUPS, DISC, discOrder, normalizeDiscipline, normalizeStoredDisciplines, better, markUnit, bestMarks, ageClass, resultClass, isIsoDate, exactAge,
     CHAMPIONSHIPS, INTL_CHAMPS, champRank, championships, titles, readTextFile, parseCSV, toCSV, headerIndex, parseDate, importPreview, columnCountWarnings,
     autoPBs, effectivePBs, setManual, resetToRecorded,
     backupStatus, exportBackup, parseBackup, applyBackup, shareOrDownload,
-    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.10" };
+    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.11" };
 })();

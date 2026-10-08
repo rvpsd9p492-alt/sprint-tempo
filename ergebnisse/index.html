@@ -449,7 +449,7 @@ $("csvFile").addEventListener("change",async e=>{
     const line=i+2, bad=[], warn=[];
     const dRaw=cell(r,"date"), date=LA.parseDate(dRaw);
     if(!dRaw) bad.push("Datum fehlt"); else if(!date) bad.push("Datum „"+dRaw+"“ ist kein gültiges Datum (erwartet z. B. 12.06.2026)");
-    const disc=cell(r,"disc"); if(!disc) bad.push("Disziplin fehlt");
+    const disc=LA.normalizeDiscipline(cell(r,"disc")); if(!disc) bad.push("Disziplin fehlt");
     const known=disc?(DISC.get(disc)||R.find(x=>x.discipline===disc)):null, u=cell(r,"unit").toLowerCase(), rawMark=cell(r,"mark");
     const kind=known?known.kind:/^(s|sek|min|h)$/.test(u)||rawMark.includes(":")?"t":/^m$/.test(u)?"d":/^(pkt\.?|punkte)$/.test(u)?"p":null;
     if(disc&&!kind) bad.push("Disziplin „"+disc+"“ ist nicht in der Liste, daher ist unklar, ob Zeit, Weite oder Punkte – Spalte „Einheit“ mit s, m oder Pkt. füllen");
@@ -623,7 +623,7 @@ function buildDiscSelect(sel){
 }
 function currentDisc(){
   const v=$("iDisc").value;
-  if(v===CUSTOM) return {name:$("iDiscName").value.trim(),kind,wind:true,custom:true};
+  if(v===CUSTOM) return {name:LA.normalizeDiscipline($("iDiscName").value),kind,wind:true,custom:true};
   if(DISC.has(v)) return Object.assign({name:v},DISC.get(v));
   const prev=R.find(r=>r.discipline===v); // eigene, schon benutzte Disziplin
   return prev?{name:v,kind:prev.kind,wind:true}:{name:"",kind:"t",wind:false};
