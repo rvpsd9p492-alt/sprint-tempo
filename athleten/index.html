@@ -33,6 +33,8 @@
 .ath .tl .md{flex:0 0 auto;width:22px;text-align:center}
 .ath .tl .tx{flex:1;min-width:0}
 .ath .tl .sm{color:var(--muted);font-size:13px}
+.ath .ty{display:flex;justify-content:space-between;font:600 14px "Barlow Condensed",sans-serif;color:var(--muted);margin-top:8px;padding-bottom:2px;border-bottom:1px solid var(--line);letter-spacing:.3px}
+.ath .ty span:last-child{font:500 13px "Barlow",sans-serif}
 .ath .akh{font:600 15px "Barlow Condensed",sans-serif;color:var(--muted);margin-top:10px;letter-spacing:.3px;display:flex;gap:6px;align-items:center}
 .ath .akh .cur{font:600 11px "Barlow",sans-serif;padding:1px 6px;border-radius:5px;background:var(--track);color:var(--track-ink)}
 .ath .pbl .pbm{display:inline-block;font:600 11px "Barlow",sans-serif;padding:0 5px;border-radius:4px;background:var(--signal);color:var(--signal-ink);margin-left:6px;vertical-align:1px}
@@ -116,12 +118,16 @@ function syncSex(){
 const MEDAL={1:"🥇",2:"🥈",3:"🥉"};
 function titleHtml(a,res){
   const t=LA.titles(a.id,res); if(!t.length) return "";
-  const n=k=>t.filter(r=>r.place===k).length;
-  const sum=[1,2,3].filter(k=>n(k)).map(k=>MEDAL[k]+" "+n(k)).join("  ");
-  return '<div class="tit"><h3>Titel &amp; Medaillen<span>'+sum+"</span></h3>"+t.map(r=>{
-    const c=LA.ageClass(a,r.date,!!r.intl);
-    return '<div class="tl"><span class="md" aria-label="Platz '+r.place+'">'+MEDAL[r.place]+'</span><span class="tx">'+esc(r.champ.trim())+" · "+esc(r.discipline)
-      +'<br><span class="sm">'+r.date.slice(0,4)+(r.meet?" · "+esc(r.meet):"")+(c?" · "+esc(c.label):"")+" · "+(r.venue==="indoor"?"Halle":"Freiluft")+" · "+esc(r.mark)+" "+LA.markUnit(r)+"</span></span></div>";
+  const count=l=>[1,2,3].filter(k=>l.some(r=>r.place===k)).map(k=>MEDAL[k]+" "+l.filter(r=>r.place===k).length).join("  ");
+  // nach Jahr gruppiert (neuestes zuerst), innerhalb des Jahres chronologisch nach Datum
+  const years=[...new Set(t.map(r=>r.date.slice(0,4)))].sort().reverse();
+  return '<div class="tit"><h3>Titel &amp; Medaillen<span>'+count(t)+"</span></h3>"+years.map(y=>{
+    const l=t.filter(r=>r.date.slice(0,4)===y).sort((x,z)=>x.date.localeCompare(z.date)||x.place-z.place);
+    return '<div class="ty"><span>'+y+"</span><span>"+count(l)+"</span></div>"+l.map(r=>{
+      const c=LA.ageClass(a,r.date,!!r.intl);
+      return '<div class="tl"><span class="md" aria-label="Platz '+r.place+'">'+MEDAL[r.place]+'</span><span class="tx">'+esc(r.champ.trim())+" · "+esc(r.discipline)
+        +'<br><span class="sm">'+LA.fmtDate(r.date).slice(0,6)+(r.meet?" · "+esc(r.meet):"")+(c?" · "+esc(c.label):"")+" · "+(r.venue==="indoor"?"Halle":"Freiluft")+" · "+esc(r.mark)+" "+LA.markUnit(r)+"</span></span></div>";
+    }).join("");
   }).join("")+"</div>";
 }
 function renderList(){
