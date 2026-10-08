@@ -25,6 +25,13 @@
 .ath .pbl .m{font:700 17px "Barlow Condensed",sans-serif;text-align:right;white-space:nowrap;padding-left:8px}
 .ath .pbl .dt{color:var(--muted);text-align:right;white-space:nowrap;padding-left:10px;width:1%}
 .ath .none{font-size:14px;color:var(--muted);margin-top:4px}
+.ath .tit{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.ath .tit h3{font:600 15px "Barlow Condensed",sans-serif;margin:0 0 4px;display:flex;justify-content:space-between;color:var(--ink)}
+.ath .tit h3 span{font:500 14px "Barlow",sans-serif;color:var(--muted)}
+.ath .tl{display:flex;gap:8px;align-items:baseline;font-size:14px;padding:3px 0}
+.ath .tl .md{flex:0 0 auto;width:22px;text-align:center}
+.ath .tl .tx{flex:1;min-width:0}
+.ath .tl .sm{color:var(--muted);font-size:13px}
 .ath .akh{font:600 15px "Barlow Condensed",sans-serif;color:var(--muted);margin-top:10px;letter-spacing:.3px;display:flex;gap:6px;align-items:center}
 .ath .akh .cur{font:600 11px "Barlow",sans-serif;padding:1px 6px;border-radius:5px;background:var(--track);color:var(--track-ink)}
 .ath .pbl .pbm{display:inline-block;font:600 11px "Barlow",sans-serif;padding:0 5px;border-radius:4px;background:var(--signal);color:var(--signal-ink);margin-left:6px;vertical-align:1px}
@@ -40,6 +47,16 @@
   <p class="sub">Zentral für alle Module: Sprint-Tempo und Wettkampfergebnisse.</p>
   <div id="list"></div>
   <a class="btn primary block" href="#neu" id="addBtn">+ Athlet anlegen</a>
+  <section style="margin-top:12px">
+    <h2>CSV-Import / -Export</h2>
+    <p class="note" style="margin-top:0">Spalten: <b>Name</b>; Jahrgang; Geburtsdatum; Geschlecht (m/w). Vorhandene Athleten (gleicher Name) werden ergänzt, neue angelegt. Die Exportdatei dient auch als Vorlage.</p>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="csvImpBtn">CSV importieren</button>
+      <button class="btn" id="csvExp">CSV exportieren</button>
+      <input type="file" id="csvFile" accept=".csv,text/csv,text/plain" hidden>
+    </div>
+    <p class="note" id="csvMsg" aria-live="polite"></p>
+  </section>
   <p class="note" style="text-align:center">Bestleistungen je Altersklasse aus allen erfassten Wettkampfergebnissen – ohne Rückenwind über +2,0 m/s und ohne Handzeiten. „PB“ = Gesamt-Bestleistung.</p>
 </div>
 
@@ -63,6 +80,8 @@
           </div>
         </div>
       </div>
+      <label class="fl" for="iBirth">Geburtsdatum (optional – für internationale Wettkämpfe)</label>
+      <input type="date" id="iBirth" max="">
       <p class="note" id="akInfo"></p>
       <p class="note" id="statInfo"></p>
     </section>
@@ -86,11 +105,23 @@ const $=id=>document.getElementById(id), esc=LA.esc;
 let editId=null, delTimer=null, fromList=false, sex=null;
 function syncSex(){
   [...$("iSex").querySelectorAll("button")].forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===sex)));
+  const bd=$("iBirth").value; if(bd&&LA.isIsoDate(bd)) $("iYear").value=bd.slice(0,4);
   const y=$("iYear").value.trim(), c=/^\d{4}$/.test(y)?LA.ageClass({birthYear:+y,sex},new Date().toISOString().slice(0,10)):null;
   $("akInfo").textContent=c?"Altersklasse "+new Date().getFullYear()+": "+c.label+(sex?"":" (Geschlecht angeben für M-/W-Klassen)")
     :"Mit Jahrgang und Geschlecht werden die Altersklassen (z. B. M45) automatisch berechnet.";
 }
 
+const MEDAL={1:"🥇",2:"🥈",3:"🥉"};
+function titleHtml(a,res){
+  const t=LA.titles(a.id,res); if(!t.length) return "";
+  const n=k=>t.filter(r=>r.place===k).length;
+  const sum=[1,2,3].filter(k=>n(k)).map(k=>MEDAL[k]+" "+n(k)).join("  ");
+  return '<div class="tit"><h3>Titel &amp; Medaillen<span>'+sum+"</span></h3>"+t.map(r=>{
+    const c=LA.ageClass(a,r.date,!!r.intl);
+    return '<div class="tl"><span class="md" aria-label="Platz '+r.place+'">'+MEDAL[r.place]+'</span><span class="tx">'+esc(r.champ.trim())+" · "+esc(r.discipline)
+      +'<br><span class="sm">'+r.date.slice(0,4)+(c?" · "+esc(c.label):"")+" · "+(r.venue==="indoor"?"Halle":"Freiluft")+" · "+esc(r.mark)+" "+LA.markUnit(r)+"</span></span></div>";
+  }).join("")+"</div>";
+}
 function renderList(){
   const list=LA.athletes(), res=LA.results(), today=new Date().toISOString().slice(0,10);
   const best=LA.bestMarks(res,{byClass:true,athletes:list}), life=new Set([...LA.bestMarks(res).values()].map(r=>r.id));
@@ -102,7 +133,7 @@ function renderList(){
     const cur=LA.ageClass(a,today);
     const groups=new Map();
     [...best.values()].filter(r=>r.athleteId===a.id).forEach(r=>{
-      const c=LA.ageClass(a,r.date), k=c?c.label:"";
+      const c=LA.ageClass(a,r.date,!!r.intl), k=c?c.label:"";
       if(!groups.has(k)) groups.set(k,{c,list:[]});
       groups.get(k).list.push(r);
     });
@@ -114,9 +145,44 @@ function renderList(){
       :(n?'<div class="none">Keine gültigen Bestleistungen</div>':'<div class="none">Noch keine Wettkampfergebnisse</div>');
     return '<button class="ath" data-id="'+esc(a.id)+'"><div class="nm"><b>'+esc(a.name)+"</b><span>"
       +(a.birthYear?"Jg. "+a.birthYear+" · ":"")+(cur?esc(cur.label)+" · ":"")+LA.plural(n,"Ergebnis","Ergebnisse")+"</span></div>"
-      +pbTxt+"</button>";
+      +pbTxt+titleHtml(a,res)+"</button>";
   }).join("");
 }
+/* ---------- CSV ---------- */
+$("csvExp").addEventListener("click",async()=>{
+  const rows=[["Name","Jahrgang","Geburtsdatum","Geschlecht"]].concat(LA.athletes().map(a=>[a.name,a.birthYear||"",a.birthDate?LA.fmtDate(a.birthDate):"",a.sex||""]));
+  const name="athleten-"+new Date().toISOString().slice(0,10)+".csv";
+  const r=await LA.shareOrDownload(name,"text/csv",LA.toCSV(rows));
+  if(r!=="aborted") $("csvMsg").textContent="„"+name+"“ exportiert.";
+});
+$("csvImpBtn").addEventListener("click",()=>$("csvFile").click());
+$("csvFile").addEventListener("change",async e=>{
+  const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f) return;
+  const rows=LA.parseCSV(await LA.readTextFile(f));
+  if(rows.length<2){ $("csvMsg").innerHTML='<span class="warn">Datei leer oder ohne Datenzeilen.</span>'; return; }
+  const H=LA.headerIndex(rows[0],{name:["Name","Athlet","Athletin"],year:["Jahrgang","JG","Jahr"],birth:["Geburtsdatum","Geburtstag","Geb.-Datum","Geb"],sex:["Geschlecht","Sex"]});
+  if(H.name<0){ $("csvMsg").innerHTML='<span class="warn">Spalte „Name“ fehlt in der ersten Zeile.</span>'; return; }
+  const list=LA.athletes(), errs=[]; let add=0, upd=0; const changes=[];
+  rows.slice(1).forEach((r,i)=>{
+    const ln=i+2, name=(r[H.name]||"").trim(); if(!name){ errs.push("Zeile "+ln+": Name fehlt"); return; }
+    const yRaw=H.year>=0?(r[H.year]||"").trim():"", bRaw=H.birth>=0?(r[H.birth]||"").trim():"", sRaw=H.sex>=0?(r[H.sex]||"").trim().toLowerCase():"";
+    const bd=bRaw?LA.parseDate(bRaw):null; if(bRaw&&!bd){ errs.push("Zeile "+ln+": Geburtsdatum „"+bRaw+"“ unlesbar"); return; }
+    const yr=yRaw?+yRaw:null; if(yRaw&&!(/^\d{4}$/.test(yRaw)&&yr>=1920&&yr<=new Date().getFullYear())){ errs.push("Zeile "+ln+": Jahrgang „"+yRaw+"“ ungültig"); return; }
+    if(bd&&yr&&+bd.slice(0,4)!==yr){ errs.push("Zeile "+ln+": Jahrgang passt nicht zum Geburtsdatum"); return; }
+    const sx=/^(m|männlich|maennlich|mann|male)$/.test(sRaw)?"m":/^(w|weiblich|frau|female|f)$/.test(sRaw)?"w":null;
+    if(sRaw&&!sx){ errs.push("Zeile "+ln+": Geschlecht „"+sRaw+"“ unbekannt (m/w)"); return; }
+    const ex=list.find(a=>a.name.toLowerCase()===name.toLowerCase())||changes.find(a=>a.name.toLowerCase()===name.toLowerCase());
+    const a=ex||{id:LA.newId("a"),name,manual:{}};
+    if(bd){ a.birthDate=bd; a.birthYear=+bd.slice(0,4); } else if(yr){ a.birthYear=yr; if(a.birthDate&&+a.birthDate.slice(0,4)!==yr) a.birthDate=null; }
+    if(sx) a.sex=sx;
+    if(!changes.includes(a)){ changes.push(a); list.includes(a)?upd++:add++; }
+  });
+  if(!changes.length){ $("csvMsg").innerHTML='<span class="warn">Nichts zu importieren.</span>'+(errs.length?"<br>"+errs.slice(0,8).map(LA.esc).join("<br>"):""); return; }
+  if(!confirm(LA.plural(add,"neuer Athlet","neue Athleten")+", "+LA.plural(upd,"Athlet wird","Athleten werden")+" ergänzt"+(errs.length?", "+LA.plural(errs.length,"Zeile","Zeilen")+" fehlerhaft (werden übersprungen)":"")+". Importieren?")) return;
+  changes.forEach(a=>LA.upsertAthlete(a));
+  $("csvMsg").innerHTML='<span class="ok">Importiert: '+add+" neu, "+upd+" ergänzt.</span>"+(errs.length?"<br>"+errs.slice(0,8).map(LA.esc).join("<br>")+(errs.length>8?"<br>…":""):"");
+  renderList();
+});
 $("list").addEventListener("click",e=>{const b=e.target.closest(".ath"); if(b) location.hash="#bearbeiten/"+encodeURIComponent(b.dataset.id);});
 
 function disarm(){const b=$("del"); b.dataset.armed=""; b.textContent="Löschen"; b.classList.remove("armed"); clearTimeout(delTimer);}
@@ -125,7 +191,7 @@ function openForm(id){
   if(id&&!a){ location.replace("#"); return; }
   editId=a?a.id:null;
   $("formHead").textContent=a?"Athlet bearbeiten":"Athlet anlegen";
-  $("iName").value=a?a.name:""; $("iYear").value=a&&a.birthYear?a.birthYear:"";
+  $("iName").value=a?a.name:""; $("iYear").value=a&&a.birthYear?a.birthYear:""; $("iBirth").value=a&&a.birthDate?a.birthDate:"";
   sex=a?a.sex:null; syncSex();
   $("del").hidden=!a; disarm(); $("formErr").textContent="";
   const n=a?LA.results().filter(r=>r.athleteId===a.id).length:0;
@@ -133,6 +199,8 @@ function openForm(id){
 }
 $("iSex").addEventListener("click",e=>{const b=e.target.closest("button"); if(!b) return; sex=sex===b.dataset.v?null:b.dataset.v; syncSex();});
 $("iYear").addEventListener("input",syncSex);
+$("iBirth").addEventListener("change",syncSex);
+$("iBirth").max=new Date().toISOString().slice(0,10);
 $("form").addEventListener("submit",e=>{
   e.preventDefault();
   const name=$("iName").value.trim(), y=$("iYear").value.trim();
@@ -141,8 +209,11 @@ $("form").addEventListener("submit",e=>{
   if(list.some(a=>a.id!==editId&&a.name.toLowerCase()===name.toLowerCase())){ $("formErr").textContent="Es gibt bereits einen Athleten mit diesem Namen."; return; }
   const yr=y?+y:null, now=new Date().getFullYear();
   if(y&&!(/^\d{4}$/.test(y)&&yr>=1920&&yr<=now)){ $("formErr").textContent="Jahrgang vierstellig, z. B. 2008."; return; }
+  const bd=$("iBirth").value||null;
+  if(bd&&!LA.isIsoDate(bd)){ $("formErr").textContent="Geburtsdatum ungültig."; return; }
+  if(bd&&yr&&+bd.slice(0,4)!==yr){ $("formErr").textContent="Jahrgang und Geburtsdatum passen nicht zusammen."; return; }
   const a=editId?list.find(x=>x.id===editId):{id:LA.newId("a"),manual:{}};
-  a.name=name; a.birthYear=yr; a.sex=sex;
+  a.name=name; a.birthYear=bd?+bd.slice(0,4):yr; a.birthDate=bd; a.sex=sex;
   if(!LA.upsertAthlete(a)){ $("formErr").textContent="Speichern fehlgeschlagen."; return; }
   close();
 });

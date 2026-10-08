@@ -27,6 +27,17 @@
     window.dispatchEvent(new CustomEvent("la:changed", { detail: { key: KEYS.deleted } }));
   }
   const newId = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  /** Gültiges Datum im Format JJJJ-MM-TT? */
+  function isIsoDate(v) {
+    if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+    const d = new Date(v + "T12:00:00Z");
+    return !isNaN(d) && d.toISOString().slice(0, 10) === v;
+  }
+  /** Alter in vollendeten Jahren am Stichtag. */
+  function exactAge(birthDate, dateIso) {
+    const [by, bm, bd] = birthDate.split("-").map(Number), [y, m, d] = String(dateIso).slice(0, 10).split("-").map(Number);
+    return y - by - (m < bm || (m === bm && d < bd) ? 1 : 0);
+  }
 
   /* ---------- Athleten ---------- */
   // { id, name, birthYear|null, manual: { "60": { v, over }, ... }, updatedAt }
@@ -39,7 +50,9 @@
       const m = a.manual && a.manual[d];
       if (m && typeof m.v === "number" && m.v > 0) manual[d] = { v: m.v, over: !!m.over };
     });
-    return { id: a.id, name: a.name.slice(0, 40), birthYear: Number.isInteger(a.birthYear) ? a.birthYear : null,
+    const bd = isIsoDate(a.birthDate) ? a.birthDate : null;
+    return { id: a.id, name: a.name.slice(0, 40),
+      birthYear: bd ? +bd.slice(0, 4) : Number.isInteger(a.birthYear) ? a.birthYear : null, birthDate: bd,
       sex: a.sex === "m" || a.sex === "w" ? a.sex : null,
       manual, updatedAt: a.updatedAt || new Date().toISOString() };
   }
@@ -113,24 +126,98 @@
      DLV-Regel: maßgeblich ist das Alter, das im Wettkampfjahr erreicht wird (Jahrgang).
      Masters in 5-Jahres-Klassen (M30, M35 …), 23–29 Männer/Frauen, darunter U23, U20, U18
      und ab 15 Jahren abwärts Einzeljahrgänge (M15, W14 …). */
-  function ageClass(athlete, dateIso) {
+  // International (WMA/EMA): Masters nach dem Alter am Wettkampftag und erst ab 35 –
+  // dafür ist das Geburtsdatum nötig; ohne Geburtsdatum gilt weiter der Jahrgang.
+  function ageClass(athlete, dateIso, intl) {
     if (!athlete || !Number.isInteger(athlete.birthYear) || !dateIso) return null;
-    const age = parseInt(String(dateIso).slice(0, 4), 10) - athlete.birthYear;
+    let age = parseInt(String(dateIso).slice(0, 4), 10) - athlete.birthYear;
+    const byDay = !!(intl && athlete.birthDate && age >= 30);
+    if (byDay) age = exactAge(athlete.birthDate, dateIso);
     if (!(age >= 0 && age < 120)) return null;
     const s = athlete.sex === "w" ? "W" : athlete.sex === "m" ? "M" : "";
     let label, minAge;
+    if (byDay && age < 35) { minAge = 23; label = s === "W" ? "Frauen" : s === "M" ? "Männer" : "Hauptklasse"; return { label, minAge, age, masters: false, byDay }; }
     if (age >= 30) { minAge = Math.floor(age / 5) * 5; label = s ? s + minAge : "AK " + minAge; }
     else if (age >= 23) { minAge = 23; label = s === "W" ? "Frauen" : s === "M" ? "Männer" : "Hauptklasse"; }
     else if (age >= 20) { minAge = 20; label = s ? s + "U23" : "U23"; }
     else if (age >= 18) { minAge = 18; label = s ? s + "JU20" : "U20"; }
     else if (age >= 16) { minAge = 16; label = s ? s + "JU18" : "U18"; }
     else { minAge = age; label = s ? s + age : "AK " + age; }
-    return { label, minAge, age, masters: age >= 30 };
+    return { label, minAge, age, masters: age >= 30, byDay };
   }
   /** Altersklasse eines Ergebnisses (oder null, wenn Athlet/Jahrgang fehlt). */
   function resultClass(r, athleteList) {
     const a = (athleteList || athletes()).find((x) => x.id === r.athleteId);
-    return a ? ageClass(a, r.date) : null;
+    return a ? ageClass(a, r.date, !!r.intl) : null;
+  }
+
+  /* ---------- Meisterschaften & Titel ---------- */
+  /** Feste Einträge des Auswahlmenüs, von regional nach international (erweiterbar über „Andere …“). */
+  const CHAMPIONSHIPS = ["Kreismeisterschaft", "Südhessische Meisterschaft", "Hessische Meisterschaft",
+    "Süddeutsche Meisterschaft", "Deutsche Meisterschaft", "Europameisterschaft", "Weltmeisterschaft"];
+  const INTL_CHAMPS = ["Europameisterschaft", "Weltmeisterschaft"];
+  const champRank = (c) => { const i = CHAMPIONSHIPS.indexOf(String(c || "").trim()); return i < 0 ? -1 : i; };
+  /** Alle Meisterschaftsnamen: feste Liste + in Ergebnissen verwendete eigene Einträge. */
+  function championships(resList) {
+    const extra = [...new Set((resList || results()).map((r) => String(r.champ || "").trim())
+      .filter((c) => c && !CHAMPIONSHIPS.includes(c)))].sort((a, b) => a.localeCompare(b, "de"));
+    return CHAMPIONSHIPS.concat(extra);
+  }
+  /** Titel & Medaillen: Meisterschaftsergebnisse mit Platz 1–3, wichtigste Meisterschaft und neueste zuerst. */
+  function titles(athleteId, resList) {
+    return (resList || results()).filter((r) => r.athleteId === athleteId && String(r.champ || "").trim() && r.place >= 1 && r.place <= 3)
+      .sort((a, b) => champRank(b.champ) - champRank(a.champ) || b.date.localeCompare(a.date) || a.place - b.place);
+  }
+
+  /* ---------- CSV ---------- */
+  /** Liest eine Textdatei; Excel unter Windows speichert oft Windows-1252 statt UTF-8. */
+  async function readTextFile(file) {
+    const buf = await file.arrayBuffer();
+    try { return new TextDecoder("utf-8", { fatal: true }).decode(buf).replace(/^\ufeff/, ""); }
+    catch (e) { return new TextDecoder("windows-1252").decode(buf); }
+  }
+  /** CSV mit Semikolon, Komma oder Tab (automatisch erkannt), Anführungszeichen, Zeilenumbrüche in Feldern. */
+  function parseCSV(text) {
+    const first = text.split(/\r?\n/)[0] || "";
+    const count = (ch) => first.split(ch).length - 1;
+    const sep = [";", "\t", ","].sort((a, b) => count(b) - count(a))[0];
+    const rows = []; let row = [], f = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) {
+        if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; }
+        else f += c;
+      } else if (c === '"') q = true;
+      else if (c === sep) { row.push(f); f = ""; }
+      else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; }
+      else f += c;
+    }
+    if (f !== "" || row.length) { row.push(f); rows.push(row); }
+    return rows.map((r) => r.map((x) => x.trim())).filter((r) => r.some((x) => x !== ""));
+  }
+  /** CSV-Text für Excel (Semikolon, UTF-8 mit BOM). */
+  function toCSV(rows) {
+    const q = (v) => { const s = String(v == null ? "" : v); return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    return "\ufeff" + rows.map((r) => r.map(q).join(";")).join("\r\n");
+  }
+  /** Spaltenüberschriften → Index, tolerant gegenüber Groß-/Kleinschreibung, Leerzeichen und Umlaut-Schreibweisen. */
+  function headerIndex(header, aliases) {
+    const norm = (s) => String(s).toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").replace(/[^a-z0-9]/g, "");
+    const h = header.map(norm), out = {};
+    Object.entries(aliases).forEach(([key, names]) => { out[key] = h.findIndex((x) => names.map(norm).includes(x)); });
+    return out;
+  }
+  /** Datum aus 12.06.2026, 12.6.26, 2026-06-12 oder 12/06/2026 → JJJJ-MM-TT (oder null). */
+  function parseDate(v) {
+    const s = String(v || "").trim();
+    let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/), y, mo, d;
+    if (m) { [, y, mo, d] = m; }
+    else if ((m = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{2}|\d{4})$/))) {
+      [, d, mo, y] = m;
+      if (y.length === 2) { const cur = new Date().getFullYear() % 100; y = (+y <= cur ? 2000 : 1900) + +y; }
+    } else return null;
+    const iso = y + "-" + String(mo).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+    return isIsoDate(iso) ? iso : null;
   }
 
   /**
@@ -327,8 +414,9 @@
   window.LA = { KEYS, SPRINT, SPRINT_DISTS, PB_MONTHS, load, save, newId, trackDelete, hash, tempoSettings, TEMPO_SETTINGS,
     athletes, saveAthletes, upsertAthlete, deleteAthlete, athleteName,
     results, saveResults, isWindy, isLegal,
-    DISCIPLINE_GROUPS, DISC, discOrder, better, markUnit, bestMarks, ageClass, resultClass,
+    DISCIPLINE_GROUPS, DISC, discOrder, better, markUnit, bestMarks, ageClass, resultClass, isIsoDate, exactAge,
+    CHAMPIONSHIPS, INTL_CHAMPS, champRank, championships, titles, readTextFile, parseCSV, toCSV, headerIndex, parseDate,
     autoPBs, effectivePBs, setManual, resetToRecorded,
     backupStatus, exportBackup, parseBackup, applyBackup, shareOrDownload,
-    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.5" };
+    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.6" };
 })();
