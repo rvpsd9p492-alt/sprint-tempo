@@ -19,7 +19,9 @@
     --s-indoor:#3987e5; --s-outdoor:#d95926; --grid:#22344a;
   }
 }
+:root[data-theme="light"]{color-scheme:light}
 :root[data-theme="dark"]{
+  color-scheme:dark;
   --bg:#0E1824; --surface:#172536; --ink:#E6EDF3; --muted:#93A3B4; --line:#2A3D52;
   --track:#2D68A8; --track-ink:#FFFFFF; --signal:#F2C230; --signal-ink:#2A2000;
   --warn:#E06A5C; --ok:#5DBB86; --link:#8DB8E8; --clay:#E08A5E;
@@ -93,3 +95,16 @@ details .in{padding:0 16px 16px}
 .importing .fab{display:none}
 .imptab .raw{font-size:12px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
 .link{background:none;border:0;color:var(--link);font:600 15px "Barlow",sans-serif;cursor:pointer;padding:6px 0;text-decoration:none}
+
+/* ---------- Breitere Bildschirme: iPad und iPhone quer ---------- */
+@media (min-width:740px){
+  main{max-width:1180px;padding:20px 24px 48px}
+  .narrow{max-width:660px;margin-left:auto;margin-right:auto}
+  .fab,.btn.block.wide-auto{display:flex;max-width:340px;margin-left:auto}
+  .split{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:0 16px;align-items:start}
+  .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+  .cards>*{margin-bottom:0!important}
+}
+@media (min-width:1100px){
+  .cards{grid-template-columns:repeat(3,minmax(0,1fr))}
+}

@@ -14,6 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#E9EEF2" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0E1824" media="(prefers-color-scheme: dark)">
+<script src="../shared/theme.js"></script>
 <style>
 @font-face{font-family:"Barlow";font-weight:400;font-style:normal;font-display:swap;src:url(../fonts/barlow-400.woff2) format("woff2")}
 @font-face{font-family:"Barlow";font-weight:500;font-style:normal;font-display:swap;src:url(../fonts/barlow-500.woff2) format("woff2")}
@@ -34,7 +35,9 @@
     --lock:#4F5F70; --warn:#E06A5C; --ok:#5DBB86; --link:#8DB8E8;
   }
 }
+:root[data-theme="light"]{color-scheme:light}
 :root[data-theme="dark"]{
+  color-scheme:dark;
   --bg:#0E1824; --surface:#172536; --ink:#E6EDF3; --muted:#93A3B4; --line:#2A3D52;
   --track:#2D68A8; --track-ink:#FFFFFF; --signal:#F2C230; --signal-ink:#2A2000;
   --lock:#4F5F70; --warn:#E06A5C; --ok:#5DBB86; --link:#8DB8E8;
@@ -46,6 +49,26 @@ body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.45 "Barlow",
   padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);
   -webkit-tap-highlight-color:transparent}
 main{max-width:560px;margin:0 auto;padding:16px 16px 40px}
+/* Hochformat iPhone: eine Spalte in der gewohnten Reihenfolge; ab 740 px (iPad, iPhone quer) zwei Spalten */
+#calc{display:flex;flex-direction:column}
+.tc-left,.tc-right,.tc-full{display:contents}
+#calc [aria-label="Lauf wählen"]{order:1} #calc .board{order:2} #calc [aria-label="Intensitätstabelle"]{order:3}
+#calc [aria-label="Rückrechnung"]{order:4} #calc details{order:5}
+@media (min-width:740px){
+  main{max-width:1180px;padding:20px 24px 48px}
+  #calc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 16px;align-items:start}
+  .tc-left,.tc-right{display:block}
+  .tc-full{display:grid;grid-column:1/-1;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 16px;align-items:start}
+}
+@media (min-width:740px) and (min-height:700px){ .tc-right{position:sticky;top:12px} }
+/* Athleten-Kasten breit: links Auswahl, rechts Bestzeiten */
+@media (min-width:740px){
+  #athBox{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);column-gap:28px;align-items:start}
+  #athBox>.row,#athChips{grid-column:1}
+  #pbBox{grid-column:2;grid-row:1/span 3}
+  #pbBox>.lbl:first-child{margin-top:0}
+  #noAth,#pbEdit{grid-column:1/-1}
+}
 h1{font:700 30px/1 "Barlow Condensed","Arial Narrow",sans-serif;margin:8px 0 2px;letter-spacing:.2px}
 h2{font:600 20px/1.2 "Barlow Condensed","Arial Narrow",sans-serif;margin:0 0 10px}
 .sub{color:var(--muted);font-size:14px;margin:0 0 16px}
@@ -173,6 +196,7 @@ details .in{padding:0 16px 16px}
   </section>
 
   <div id="calc">
+  <div class="tc-left">
   <section aria-label="Lauf wählen">
     <div class="lbl">Strecke</div>
     <div class="chips" id="dist"></div>
@@ -194,6 +218,15 @@ details .in{padding:0 16px 16px}
     </div>
   </section>
 
+  <section aria-label="Rückrechnung">
+    <h2>Gelaufene Zeit einordnen</h2>
+    <div class="inline" style="margin-top:0"><span>Gestoppt</span><input type="text" id="ran" inputmode="decimal" placeholder="s" autocomplete="off"> s</div>
+    <div class="out" id="ranOut">–</div>
+    <p class="note" id="ranNote">Gilt für die oben gewählte Strecke, Startart und Messung.</p>
+  </section>
+
+  </div>
+  <div class="tc-right">
   <div class="board" aria-live="polite">
     <div class="meta" id="bMeta"></div>
     <div class="time" id="bTime"></div>
@@ -209,13 +242,8 @@ details .in{padding:0 16px 16px}
     <p class="note" id="refNote"></p>
   </section>
 
-  <section aria-label="Rückrechnung">
-    <h2>Gelaufene Zeit einordnen</h2>
-    <div class="inline" style="margin-top:0"><span>Gestoppt</span><input type="text" id="ran" inputmode="decimal" placeholder="s" autocomplete="off"> s</div>
-    <div class="out" id="ranOut">–</div>
-    <p class="note" id="ranNote">Gilt für die oben gewählte Strecke, Startart und Messung.</p>
-  </section>
-
+  </div>
+  <div class="tc-full">
   <details>
     <summary>Modell und Annahmen</summary>
     <div class="in">
@@ -243,6 +271,7 @@ details .in{padding:0 16px 16px}
       <p><span class="tag">Vermutung</span>Hochstart-Zuschlag und Handzeit-Abzüge sind Erfahrungswerte; mit Freelap-/Videovergleich kalibrieren.</p>
     </div>
   </details>
+  </div>
   </div>
 
   <section aria-label="Datensicherung">

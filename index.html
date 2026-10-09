@@ -14,6 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#E9EEF2" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0E1824" media="(prefers-color-scheme: dark)">
+<script src="shared/theme.js"></script>
 <link rel="stylesheet" href="shared/base.css">
 <style>
 .hero{background:var(--track);color:var(--track-ink);border-radius:14px;padding:22px 16px 18px;margin-bottom:12px;position:relative;overflow:hidden}
@@ -33,6 +34,11 @@
 .tile .st{display:block;font-size:13px;color:var(--ink);margin-top:4px;font-variant-numeric:tabular-nums}
 .tile .go{color:var(--muted);font-size:26px}
 .tile.soon{opacity:.55;pointer-events:none}
+@media (min-width:740px){
+  main{max-width:980px}
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hubcols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:0 12px;align-items:start}
+}
 .tile.soon .ic{background:var(--line)}
 h3{font:600 17px "Barlow Condensed",sans-serif;margin:16px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
 h3:first-of-type{margin-top:4px}
@@ -108,6 +114,17 @@ h3:first-of-type{margin-top:4px}
     </div>
   </nav>
 
+  <div class="hubcols">
+  <section aria-labelledby="thHead" id="thBox">
+    <h2 id="thHead">Darstellung</h2>
+    <div class="seg" id="thSeg" role="group" aria-label="Darstellung">
+      <button type="button" data-v="system">System</button>
+      <button type="button" data-v="light">Hell</button>
+      <button type="button" data-v="dark">Dunkel</button>
+    </div>
+    <p class="note" id="thNote"></p>
+  </section>
+
   <section aria-labelledby="bkHead">
     <h2 id="bkHead">Datensicherung</h2>
     <div id="cloudBox" hidden>
@@ -155,6 +172,7 @@ h3:first-of-type{margin-top:4px}
     <p class="note" id="bkMsg" aria-live="polite"></p>
   </section>
 
+  </div>
   <p class="foot">Version <span id="ver"></span> · <span id="offState">Offline-Modus wird vorbereitet …</span></p>
 </main>
 <script src="shared/config.js"></script>
@@ -210,6 +228,15 @@ $("impFile").addEventListener("change",async e=>{
   render();
 });
 window.addEventListener("pageshow",render);
+
+/* ---------- Darstellung ---------- */
+function renderTheme(){
+  const m=LA_THEME.get();
+  [...$("thSeg").querySelectorAll("button")].forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===m)));
+  $("thNote").textContent=m==="system"?"Folgt der Einstellung von iPhone/iPad (hell am Tag, dunkel bei Nacht, falls so eingestellt).":"Gilt auf diesem Gerät für alle Bereiche der App.";
+}
+$("thSeg").addEventListener("click",e=>{const b=e.target.closest("button"); if(!b) return; LA_THEME.set(b.dataset.v); renderTheme(); });
+renderTheme();
 
 /* ---------- Cloud ---------- */
 const C=LA.cloud;

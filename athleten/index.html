@@ -14,6 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#E9EEF2" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0E1824" media="(prefers-color-scheme: dark)">
+<script src="../shared/theme.js"></script>
 <link rel="stylesheet" href="../shared/base.css">
 <style>
 .ath{display:block;width:100%;text-align:left;background:var(--surface);border:0;border-radius:14px;padding:14px 16px;margin-bottom:8px;color:var(--ink);font:inherit;cursor:pointer}
@@ -48,8 +49,8 @@
   <a class="back" href="../">Übersicht</a>
   <h1>Athleten</h1>
   <p class="sub">Zentral für alle Module: Sprint-Tempo und Wettkampfergebnisse.</p>
-  <div id="list"></div>
-  <a class="btn primary block" href="#neu" id="addBtn">+ Athlet anlegen</a>
+  <div id="list" class="cards"></div>
+  <a class="btn primary block wide-auto" href="#neu" id="addBtn" style="margin-top:12px">+ Athlet anlegen</a>
   <section style="margin-top:12px">
     <h2>CSV-Import / -Export</h2>
     <p class="note" style="margin-top:0">Spalten: <b>Name</b>; Jahrgang; Geburtsdatum; Geschlecht (m/w). Vorhandene Athleten (gleicher Name) werden ergänzt, neue angelegt. Die Exportdatei dient auch als Vorlage.</p>
@@ -64,7 +65,7 @@
   <p class="note" style="text-align:center">Bestleistungen je Altersklasse aus allen erfassten Wettkampfergebnissen – ohne Rückenwind über +2,0 m/s und ohne Handzeiten. „PB“ = Gesamt-Bestleistung.</p>
 </div>
 
-<div id="viewForm" hidden>
+<div id="viewForm" class="narrow" hidden>
   <a class="back" href="#" id="cancelTop">Abbrechen</a>
   <h1 id="formHead">Athlet anlegen</h1>
   <form id="form" novalidate autocomplete="off">

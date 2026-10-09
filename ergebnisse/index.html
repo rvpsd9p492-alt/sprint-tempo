@@ -14,11 +14,13 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#E9EEF2" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0E1824" media="(prefers-color-scheme: dark)">
+<script src="../shared/theme.js"></script>
 <link rel="stylesheet" href="../shared/base.css">
 <style>
 .topbar{display:flex;justify-content:space-between;align-items:center}
 .count{font-size:14px;color:var(--muted);margin:10px 0 0}
 .yearhead{font:600 18px "Barlow Condensed",sans-serif;color:var(--muted);margin:18px 4px 8px;display:flex;justify-content:space-between}
+@media (min-width:740px){ .mainlist .yearhead:first-child{margin-top:0} }
 .res{display:block;width:100%;text-align:left;background:var(--surface);border:0;border-radius:14px;padding:12px 14px;margin-bottom:8px;color:var(--ink);font:inherit;cursor:pointer}
 .res:active{transform:scale(.995)}
 .res .top{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
@@ -76,6 +78,8 @@
     <button class="btn primary" id="bkBtn">Jetzt sichern</button>
   </div>
 
+  <div class="split">
+  <div class="side">
   <section aria-label="Filter" id="filterBox">
     <div class="grid2">
       <div style="grid-column:1/-1"><label class="fl" for="fAth" style="margin-top:0">Athlet</label><select id="fAth"></select></div>
@@ -116,7 +120,9 @@
     <p class="note">Je Altersklasse; ohne Rückenwind über +2,0 m/s und ohne Handzeiten.</p>
   </section>
 
-  <div id="list"></div>
+  </div>
+  <div class="mainlist"><div id="list"></div></div>
+  </div>
 
   <div class="row" style="justify-content:center;margin-top:8px">
     <button class="btn" id="csv">Gefilterte Liste als CSV (Excel)</button>
@@ -133,7 +139,7 @@
 </div>
 
 <!-- ============ Formular ============ -->
-<div id="viewForm" hidden>
+<div id="viewForm" class="narrow" hidden>
   <div class="topbar"><a class="back" href="#" id="fCancelTop">Abbrechen</a></div>
   <h1 id="formHead">Ergebnis erfassen</h1>
   <p class="sub" id="formSub">Pflichtfelder: Datum, Disziplin, Halle/Freiluft, Ergebnis.</p>
