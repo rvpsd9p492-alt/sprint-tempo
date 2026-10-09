@@ -140,9 +140,9 @@ function titleHtml(a,res){
     body=names.map(nm=>{ const l=t.filter(r=>LA.canonChamp(r.champ)===nm).sort((x,z)=>z.date.localeCompare(x.date)||x.place-z.place);
       return '<div class="ty"><span>'+esc(nm)+"</span><span>"+count(l)+"</span></div>"+l.map(r=>line(r,esc(r.discipline),LA.fmtDate(r.date))).join(""); }).join("");
   } else {
-    // nach Jahr: neuestes zuerst, innerhalb des Jahres chronologisch
+    // nach Jahr: neuestes zuerst, auch innerhalb des Jahres
     const years=[...new Set(t.map(r=>r.date.slice(0,4)))].sort().reverse();
-    body=years.map(y=>{ const l=t.filter(r=>r.date.slice(0,4)===y).sort((x,z)=>x.date.localeCompare(z.date)||x.place-z.place);
+    body=years.map(y=>{ const l=t.filter(r=>r.date.slice(0,4)===y).sort((x,z)=>z.date.localeCompare(x.date)||x.place-z.place);
       return '<div class="ty"><span>'+y+"</span><span>"+count(l)+"</span></div>"+l.map(r=>line(r,esc(LA.canonChamp(r.champ))+" · "+esc(r.discipline),LA.fmtDate(r.date).slice(0,6))).join(""); }).join("");
   }
   return '<div class="tit"><h3>Titel &amp; Medaillen<span>'+count(t)+"</span></h3>"
