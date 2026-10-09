@@ -541,7 +541,7 @@ function renderChart(){
 }
 function drawChart(pts,ath){
   const W=Math.max(280,$("chart").clientWidth||320), H=240, m={l:50,r:14,t:36,b:26};
-  const iw=W-m.l-m.r, ih=H-m.t-m.b, kind=pts[0].kind, day=864e5;
+  const iw=W-m.l-m.r, ih=H-m.t-m.b, kind=pts[0].kind, inv=kind==="t", day=864e5;
   const ts=r=>Date.parse(r.date+"T12:00:00Z");
   let x0=Math.min(...pts.map(ts)), x1=Math.max(...pts.map(ts));
   if(x1-x0<60*day){ x0-=30*day; x1+=30*day; }
@@ -550,15 +550,15 @@ function drawChart(pts,ath){
   if(hi-lo<1e-9){ const e=Math.max(Math.abs(lo)*0.02,0.05); lo-=e; hi+=e; }
   const nt=niceTicks(lo,hi,4), y0=nt.ticks[0], y1=nt.ticks[nt.ticks.length-1];
   const X=t=>m.l+(t-x0)/(x1-x0)*iw;
-  // Skala normal: kleiner Wert unten – bei Läufen stehen die schnellsten Zeiten also unten
-  const Y=v=>m.t+ih-(v-y0)/(y1-y0)*ih;
+  // besser = oben: bei Läufen ist die Skala umgedreht, die schnellsten Zeiten stehen oben
+  const Y=v=>inv?m.t+(v-y0)/(y1-y0)*ih:m.t+ih-(v-y0)/(y1-y0)*ih;
   const col=r=>r.venue==="indoor"?"var(--s-indoor)":"var(--s-outdoor)";
   let g="";
   // Gitter + y-Achse
   nt.ticks.forEach(v=>{ const y=Y(v).toFixed(1);
     g+='<line x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+y+'" y2="'+y+'" style="stroke:var(--grid)" stroke-width="1"/>'
       +'<text x="'+(m.l-6)+'" y="'+y+'" dy="0.32em" text-anchor="end">'+fmtVal(v,kind,nt.dec)+"</text>"; });
-  g+='<text x="0" y="11">'+(kind==="t"?"schneller ↓":"besser ↑")+"</text>";
+  g+='<text x="0" y="11">'+(inv?"schneller ↑":"besser ↑")+"</text>";
   // x-Achse: Jahre oder Monate
   const span=(x1-x0)/(365.25*day), d0=new Date(x0), ticks=[];
   if(span>=1.5){ for(let y=d0.getUTCFullYear()+1; Date.UTC(y,0,1)<=x1; y++) ticks.push([Date.UTC(y,0,1),String(y)]); }
