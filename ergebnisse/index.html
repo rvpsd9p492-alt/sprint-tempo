@@ -153,6 +153,11 @@
 
   <form id="form" novalidate autocomplete="off">
   <section>
+    <div id="evBox" hidden style="margin-bottom:12px">
+      <div class="row" style="justify-content:space-between"><label class="fl" for="iEvent" style="margin:0">Wettkampf aus dem Kalender</label><a class="link" href="../kalender/">Kalender</a></div>
+      <select id="iEvent" style="margin-top:6px"></select>
+      <p class="hint">Übernimmt Datum, Halle/Freiluft, Sportfest und Meisterschaft.</p>
+    </div>
     <div class="row" style="justify-content:space-between"><label class="fl" for="iAth" style="margin:0">Athlet</label><a class="link" href="../athleten/?back=ergebnisse">Athleten verwalten</a></div>
     <select id="iAth" style="margin-top:6px"></select>
     <p class="hint" id="akHint"></p>
@@ -688,7 +693,8 @@ function syncForm(){
 const meets=()=>[...new Set(R.map(r=>String(r.meet||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"de"));
 const normMeet=v=>{ const t=String(v||"").trim().replace(/\s+/g," "); return t?(meets().find(m=>m.toLowerCase()===t.toLowerCase())||t):""; };
 function fillChampSelect(sel){
-  $("iChampSel").innerHTML=opt("","– keine Meisterschaft –",sel)+LA.championships(R).map(c=>opt(c,c,sel)).join("")+opt("__new","Andere …",sel);
+  const list=LA.championships(R); if(sel&&!list.includes(sel)) list.push(sel);
+  $("iChampSel").innerHTML=opt("","– keine Meisterschaft –",sel)+list.map(c=>opt(c,c,sel)).join("")+opt("__new","Andere …",sel);
   $("champNewBox").hidden=$("iChampSel").value!=="__new";
 }
 $("iChampSel").addEventListener("change",()=>{
@@ -699,7 +705,22 @@ $("iChampSel").addEventListener("change",()=>{
 });
 $("iIntl").addEventListener("change",updAk);
 function disarmDel(){const b=$("fDel"); b.dataset.armed=""; b.textContent="Löschen"; b.classList.remove("armed"); clearTimeout(delTimer);}
-function openForm(id){
+/* Wettkampf aus dem Kalender: Auswahl füllen und Angaben übernehmen */
+function fillEventSelect(sel){
+  const t=today(), list=LA.events().filter(e=>e.date<=t||e.id===sel).reverse();
+  $("evBox").hidden=!list.length;
+  $("iEvent").innerHTML=opt("","– ohne –",sel||"")+list.map(e=>opt(e.id,LA.fmtDate(e.date)+" · "+LA.eventTitle(e),sel||"")).join("");
+}
+function applyEvent(id){
+  const e=LA.events().find(x=>x.id===id); if(!e) return;
+  $("iDate").value=e.date; venue=e.venue; $("iIntl").checked=e.intl;
+  $("iMeet").value=e.kind==="champ"&&!e.name?"":LA.eventTitle(e);
+  fillChampSelect(e.kind==="champ"&&e.champ?LA.canonChamp(e.champ):"");
+  if(e.athleteIds.length===1&&ATH.some(a=>a.id===e.athleteIds[0])) $("iAth").value=e.athleteIds[0];
+  syncForm(); updAk();
+}
+$("iEvent").addEventListener("change",()=>{ if($("iEvent").value) applyEvent($("iEvent").value); });
+function openForm(id,evId){
   const r=id?R.find(x=>x.id===id):null;
   if(id&&!r){go("#",true);return;}
   editId=r?r.id:null;
@@ -725,6 +746,8 @@ function openForm(id){
   $("iPlace").value=r&&r.place?r.place:"";
   $("iComment").value=r?r.comment||"":"";
   fillChampSelect(r?LA.canonChamp(r.champ):""); syncForm(); updAk();
+  fillEventSelect(r?r.eventId:evId);
+  if(!r&&evId) applyEvent(evId);
 }
 function updAk(){
   const a=ATH.find(x=>x.id===$("iAth").value), d=$("iDate").value, intl=$("iIntl").checked;
@@ -763,7 +786,7 @@ $("form").addEventListener("submit",e=>{
   if(pRaw&&!/^\d{1,4}$/.test(pRaw)) return err("Platzierung als Zahl, z. B. 3.");
   const now=new Date().toISOString();
   const rec={athleteId,date,discipline:d.name,kind:d.kind,venue,mark:m.mark,value:m.value,wind,hand:d.kind==="t"&&m.value!=null&&$("iHand").checked,
-    meet:normMeet($("iMeet").value),champ,intl:$("iIntl").checked,place:pRaw?+pRaw:null,comment:$("iComment").value.trim(),updatedAt:now};
+    meet:normMeet($("iMeet").value),champ,eventId:$("iEvent").value||null,intl:$("iIntl").checked,place:pRaw?+pRaw:null,comment:$("iComment").value.trim(),updatedAt:now};
   if(editId){ Object.assign(R.find(x=>x.id===editId),rec); }
   else R.push(Object.assign({id:"r"+Date.now().toString(36)+Math.random().toString(36).slice(2,7),createdAt:now},rec));
   persist();
@@ -787,11 +810,11 @@ function closeForm(){ if(fromList) history.back(); else go("#",true); }
 $("addBtn").addEventListener("click",e=>{e.preventDefault(); go("#neu");});
 function route(){
   const h=location.hash;
-  const m=h.match(/^#bearbeiten\/(.+)$/);
-  if(h==="#neu"||m){
+  const m=h.match(/^#bearbeiten\/(.+)$/), w=h.match(/^#neu\/wk\/(.+)$/);
+  if(h==="#neu"||m||w){
     if(!$("viewList").hidden){ listScroll=window.scrollY; fromList=true; }
     $("viewList").hidden=true; $("viewForm").hidden=false;
-    openForm(m?decodeURIComponent(m[1]):null);
+    openForm(m?decodeURIComponent(m[1]):null,w?decodeURIComponent(w[1]):null);
     window.scrollTo(0,0);
   } else {
     const wasForm=!$("viewForm").hidden;

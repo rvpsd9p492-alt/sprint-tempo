@@ -1,9 +1,9 @@
 /* Gemeinsame Funktionen aller Leichtathletik-Module: Athleten, Ergebnisse, Bestzeiten, Sicherung, Offline. */
 (function () {
   "use strict";
-  const KEYS = { athletes: "laAthletes.v1", tempo: "sprintTempo.v1", results: "laResults.v1", meta: "laMeta.v1",
+  const KEYS = { athletes: "laAthletes.v1", tempo: "sprintTempo.v1", results: "laResults.v1", events: "laEvents.v1", meta: "laMeta.v1",
     deleted: "laDeleted.v1", cloud: "laCloud.v1" };
-  const SYNCED = [KEYS.athletes, KEYS.results, KEYS.tempo];
+  const SYNCED = [KEYS.athletes, KEYS.results, KEYS.tempo, KEYS.events];
   const TEMPO_SETTINGS = ["rt", "hochPen", "handStd", "handFly", "kExt", "tol"];
   /** Sprintstrecken, deren Bestzeiten Sprint-Tempo nutzt (Schlüssel = Strecke in m). */
   const SPRINT = { "60": "60 m", "100": "100 m", "200": "200 m", "400": "400 m" };
@@ -97,6 +97,75 @@
   const isWindy = (r) => r.wind != null && r.wind > 2.0;
   /** Gültig für Bestleistungen: Ergebnis vorhanden, kein Rückenwind > 2,0, nicht handgestoppt. */
   const isLegal = (r) => r.value != null && !isWindy(r) && !r.hand;
+
+  /* ---------- Wettkampfkalender ---------- */
+  // { id, kind: "meet"|"champ"|"other", champ, name, date, endDate|null, place, venue: "indoor"|"outdoor",
+  //   deadline|null (Meldeschluss), entered (gemeldet), intl, athleteIds: [], url, note, createdAt, updatedAt }
+  // In der Cloud als kind "settings" mit id "event:<id>" gespeichert: ältere App-Versionen ignorieren diese Zeilen.
+  const EVENT_KINDS = { meet: "Sportfest", champ: "Meisterschaft", other: "Sonstiger Wettkampf" };
+  function cleanEvent(e) {
+    if (!e || typeof e.id !== "string" || !isIsoDate(e.date)) return null;
+    const kind = EVENT_KINDS[e.kind] ? e.kind : "meet";
+    const str = (v, n) => String(v || "").trim().slice(0, n);
+    const endDate = isIsoDate(e.endDate) && e.endDate > e.date ? e.endDate : null;
+    return { id: e.id, kind, champ: kind === "champ" ? str(e.champ, 60) : "", name: str(e.name, 100), date: e.date, endDate,
+      place: str(e.place, 80), venue: e.venue === "indoor" ? "indoor" : "outdoor", deadline: isIsoDate(e.deadline) ? e.deadline : null,
+      intl: !!e.intl, entered: !!e.entered, athleteIds: Array.isArray(e.athleteIds) ? e.athleteIds.filter((x) => typeof x === "string") : [],
+      url: /^https?:\/\//i.test(str(e.url, 300)) ? str(e.url, 300) : "", note: str(e.note, 500),
+      createdAt: e.createdAt || e.updatedAt || new Date().toISOString(), updatedAt: e.updatedAt || new Date().toISOString() };
+  }
+  function events() {
+    const l = load(KEYS.events, []);
+    return (Array.isArray(l) ? l : []).map(cleanEvent).filter(Boolean).sort((a, b) => a.date.localeCompare(b.date) || eventTitle(a).localeCompare(eventTitle(b), "de"));
+  }
+  function saveEvents(list) { return save(KEYS.events, list.map(cleanEvent).filter(Boolean)); }
+  /** Anzeigename: eigener Name, sonst Meisterschaft (+ Ort). */
+  function eventTitle(e) {
+    if (e.name) return e.name;
+    if (e.kind === "champ" && e.champ) return e.champ + (e.place ? " " + e.place.split(",")[0] : "");
+    return EVENT_KINDS[e.kind] + (e.place ? " " + e.place.split(",")[0] : "");
+  }
+  const eventType = (e) => (e.kind === "champ" && e.champ ? canonChamp(e.champ) : EVENT_KINDS[e.kind]);
+  /** Tage von heute bis zum Datum (negativ = vorbei). */
+  function daysUntil(iso, today) {
+    const t = today || new Date().toISOString().slice(0, 10);
+    return Math.round((Date.parse(iso + "T12:00:00Z") - Date.parse(t + "T12:00:00Z")) / 864e5);
+  }
+
+  /* iCalendar (.ics) für Apple-Kalender, Outlook, Google: ganztägige Termine + Meldeschluss mit Erinnerung */
+  function icsText(v) { return String(v || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n"); }
+  function icsFold(line) { // Zeilen > 75 Byte umbrechen (UTF-8-sicher)
+    const enc = new TextEncoder(); let out = "", cur = "", len = 0;
+    for (const ch of line) { const n = enc.encode(ch).length; if (len + n > 74) { out += cur + "\r\n "; cur = ""; len = 1; } cur += ch; len += n; }
+    return out + cur;
+  }
+  const icsDate = (iso) => iso.replace(/-/g, "");
+  const nextDay = (iso) => new Date(Date.parse(iso + "T12:00:00Z") + 864e5).toISOString().slice(0, 10);
+  function eventsToICS(list, opts) {
+    const o = opts || {}, stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+    const L = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Leichtathletik-App//Wettkampfkalender//DE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
+    if (o.name) L.push("X-WR-CALNAME:" + icsText(o.name));
+    list.forEach((e) => {
+      const title = eventTitle(e), desc = [eventType(e), e.venue === "indoor" ? "Halle" : "Freiluft"];
+      if (e.deadline) desc.push("Meldeschluss " + fmtDate(e.deadline));
+      if (e.note) desc.push(e.note);
+      L.push("BEGIN:VEVENT", "UID:" + e.id + "@leichtathletik-app", "DTSTAMP:" + stamp,
+        "DTSTART;VALUE=DATE:" + icsDate(e.date), "DTEND;VALUE=DATE:" + icsDate(nextDay(e.endDate || e.date)),
+        "SUMMARY:" + icsText(title), "DESCRIPTION:" + icsText(desc.join(" · ")), "TRANSP:TRANSPARENT");
+      if (e.place) L.push("LOCATION:" + icsText(e.place));
+      if (e.url) L.push("URL:" + e.url);
+      L.push("END:VEVENT");
+      if (e.deadline) {
+        L.push("BEGIN:VEVENT", "UID:" + e.id + "-meldeschluss@leichtathletik-app", "DTSTAMP:" + stamp,
+          "DTSTART;VALUE=DATE:" + icsDate(e.deadline), "DTEND;VALUE=DATE:" + icsDate(nextDay(e.deadline)),
+          "SUMMARY:" + icsText("Meldeschluss: " + title), "DESCRIPTION:" + icsText("Wettkampf am " + fmtDate(e.date)), "TRANSP:TRANSPARENT",
+          // Erinnerung am Vortag um 9 Uhr
+          "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsText("Meldeschluss morgen: " + title), "TRIGGER:-PT15H", "END:VALARM", "END:VEVENT");
+      }
+    });
+    L.push("END:VCALENDAR");
+    return L.map(icsFold).join("\r\n") + "\r\n";
+  }
 
   /* ---------- Disziplinen & Bestleistungen ---------- */
   // [Name, Wertung (t=Zeit, d=Weite/Höhe, p=Punkte), Windmessung im Freien]
@@ -396,14 +465,16 @@
     return set;
   }
   function fingerprint() {
-    return hash(JSON.stringify({ a: load(KEYS.athletes, []), s: tempoSettings(), r: load(KEYS.results, []) }));
+    const ev = load(KEYS.events, []);
+    return hash(JSON.stringify(Array.isArray(ev) && ev.length ? { a: load(KEYS.athletes, []), s: tempoSettings(), r: load(KEYS.results, []), e: ev }
+      : { a: load(KEYS.athletes, []), s: tempoSettings(), r: load(KEYS.results, []) }));
   }
   function backupStatus() {
     const m = load(KEYS.meta, {}) || {};
-    const c = { athletes: athletes().length, results: results().length };
+    const c = { athletes: athletes().length, results: results().length, events: events().length };
     const cloud = window.LA && LA.cloud ? LA.cloud.status() : null;
     const cloudSafe = !!(cloud && cloud.loggedIn && cloud.clean);
-    return { empty: c.athletes + c.results === 0, upToDate: cloudSafe || m.lastFp === fingerprint(),
+    return { empty: c.athletes + c.results + c.events === 0, upToDate: cloudSafe || m.lastFp === fingerprint(),
       fileUpToDate: m.lastFp === fingerprint(), cloudSafe, lastAt: m.lastAt || null, ...c };
   }
   function markBackedUp() {
@@ -430,7 +501,7 @@
 
   async function exportBackup() {
     const data = { app: "leichtathletik", v: 2, exported: new Date().toISOString(),
-      athletes: athletes(), tempoSettings: tempoSettings(), results: results() };
+      athletes: athletes(), tempoSettings: tempoSettings(), results: results(), events: events() };
     const name = "leichtathletik-sicherung-" + new Date().toISOString().slice(0, 10) + ".json";
     const res = await shareOrDownload(name, "application/json", JSON.stringify(data, null, 2));
     if (res !== "aborted") markBackedUp();
@@ -440,12 +511,13 @@
   /* Liest eine Sicherungsdatei (v2, v1 oder alte Sprint-Tempo-Sicherung) in ein einheitliches Format. */
   function parseBackup(text) {
     const d = JSON.parse(text);
-    const out = { athletes: [], tempoSettings: {}, results: [] };
+    const out = { athletes: [], tempoSettings: {}, results: [], events: [] };
     const pickSettings = (src) => { TEMPO_SETTINGS.forEach((k) => { if (src && typeof src[k] === "number") out.tempoSettings[k] = src[k]; }); };
     if (d && d.app === "leichtathletik" && d.v >= 2) {
       out.athletes = (Array.isArray(d.athletes) ? d.athletes : []).map(cleanAthlete).filter(Boolean);
       pickSettings(d.tempoSettings);
       out.results = Array.isArray(d.results) ? d.results : [];
+      out.events = (Array.isArray(d.events) ? d.events : []).map(cleanEvent).filter(Boolean);
     } else if (d && d.app === "leichtathletik") {
       const t = d.tempo || {};
       out.athletes = (Array.isArray(t.athletes) ? t.athletes : []).map(fromTempoAthlete).filter(Boolean);
@@ -477,8 +549,10 @@
     if (Object.keys(b.tempoSettings).length) save(KEYS.tempo, Object.assign(load(KEYS.tempo, {}) || {}, b.tempoSettings));
     const mr = mergeById(results(), b.results);
     saveResults(mr.list);
+    const me = mergeById(events(), b.events || []);
+    if (me.added + me.updated) saveEvents(me.list);
     markBackedUp();
-    return { athletes: ma.added + ma.updated, results: mr.added + mr.updated };
+    return { athletes: ma.added + ma.updated, results: mr.added + mr.updated, events: me.added + me.updated };
   }
 
   /* ---------- Formatierung ---------- */
@@ -508,9 +582,10 @@
   window.LA = { KEYS, SPRINT, SPRINT_DISTS, PB_MONTHS, load, save, newId, trackDelete, hash, tempoSettings, TEMPO_SETTINGS,
     athletes, saveAthletes, upsertAthlete, deleteAthlete, athleteName,
     results, saveResults, isWindy, isLegal,
+    EVENT_KINDS, cleanEvent, events, saveEvents, eventTitle, eventType, daysUntil, eventsToICS,
     DISCIPLINE_GROUPS, DISC, discOrder, normalizeDiscipline, normalizeStoredDisciplines, better, markUnit, bestMarks, ageClass, resultClass, isIsoDate, exactAge,
     CHAMPIONSHIPS, INTL_CHAMPS, canonChamp, champRank, isIntlChamp, championships, titles, readTextFile, parseCSV, toCSV, headerIndex, parseDate, importPreview, columnCountWarnings,
     autoPBs, effectivePBs, setManual, resetToRecorded,
     backupStatus, exportBackup, parseBackup, applyBackup, shareOrDownload,
-    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.17" };
+    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.18" };
 })();

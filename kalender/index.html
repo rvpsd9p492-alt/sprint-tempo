@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wettkampfkalender</title>
+<meta name="description" content="Wettkämpfe mit Datum, Ort und Meldeschluss planen und Ergebnisse direkt zuordnen.">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Leichtathletik">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#E9EEF2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1824" media="(prefers-color-scheme: dark)">
+<script src="../shared/theme.js"></script>
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+.ev{display:flex;gap:12px;background:var(--surface);border-radius:14px;padding:12px 14px;margin-bottom:8px;color:var(--ink);cursor:pointer}
+.ev .cal{flex:0 0 52px;text-align:center;border-radius:10px;background:var(--bg);padding:6px 0 5px;align-self:flex-start}
+.ev .cal b{display:block;font:700 24px/1 "Barlow Condensed",sans-serif;font-variant-numeric:tabular-nums}
+.ev .cal span{display:block;font:600 12px "Barlow",sans-serif;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+.ev .cal small{display:block;font-size:11px;color:var(--muted)}
+.ev .bd{flex:1;min-width:0}
+.ev .nm{font:600 19px/1.15 "Barlow Condensed",sans-serif;overflow-wrap:anywhere}
+.ev .meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--muted);margin-top:4px}
+.ev .dl{font-size:14px;margin-top:6px;font-variant-numeric:tabular-nums}
+.ev .dl.soon{color:var(--warn);font-weight:600}
+.ev .dl.done{color:var(--ok);font-weight:600}
+.ev .dl.over{color:var(--muted)}
+.ev .who{font-size:14px;margin-top:4px}
+.ev .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.ev .acts .btn{min-height:36px;padding:6px 12px;font-size:14px}
+.ev .rs{font-size:14px;margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
+.ev .rs div{display:flex;justify-content:space-between;gap:8px;padding:2px 0;font-variant-numeric:tabular-nums}
+.ev .rs b{font:700 16px "Barlow Condensed",sans-serif;white-space:nowrap}
+.ev.past{opacity:.92}
+.mhead{font:600 18px "Barlow Condensed",sans-serif;color:var(--muted);margin:16px 4px 8px;display:flex;justify-content:space-between}
+.mhead:first-child{margin-top:4px}
+.empty{text-align:center;color:var(--muted);padding:24px 10px}
+.fab{position:sticky;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:5;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.err{color:var(--warn);font-size:14px;font-weight:600;margin:8px 0 0}
+.hint{font-size:13px;color:var(--muted);margin:4px 0 0}
+.chk{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:15px;cursor:pointer}
+.chk input{width:22px;height:22px;accent-color:var(--track)}
+.athl{display:flex;flex-wrap:wrap;gap:4px 16px}
+.feed{word-break:break-all;font-size:13px;color:var(--muted);background:var(--bg);border-radius:8px;padding:8px 10px;margin-top:8px}
+.formbtns{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.formbtns .primary{flex:1 1 auto}
+@media (min-width:740px){ .evcols{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:0 16px;align-items:start} }
+</style>
+</head>
+<body>
+<main>
+<div id="viewList">
+  <a class="back" href="../">Übersicht</a>
+  <h1>Wettkampfkalender</h1>
+  <p class="sub">Wettkämpfe mit Ort und Meldeschluss planen – und Ergebnisse direkt zuordnen.</p>
+  <div class="evcols">
+    <div>
+      <div id="upcoming"></div>
+      <details id="pastBox" hidden>
+        <summary id="pastHead">Vergangene Wettkämpfe</summary>
+        <div class="in" id="past"></div>
+      </details>
+    </div>
+    <div>
+      <section aria-labelledby="aboHead">
+        <h2 id="aboHead">Apple-Kalender</h2>
+        <p class="note" style="margin-top:0">Als <b>Kalender-Abo</b> erscheinen alle Wettkämpfe und Meldeschlüsse im Apple-Kalender und aktualisieren sich von selbst, wenn du hier etwas änderst.</p>
+        <div id="aboBox"></div>
+        <p class="note" id="aboMsg" aria-live="polite"></p>
+        <p class="note">Einzelne Wettkämpfe lassen sich auch als <b>.ics-Datei</b> übernehmen (Knopf „Kalender“ am Wettkampf) – die Datei ändert sich aber nicht mit.</p>
+        <button class="btn" id="icsAll" style="margin-top:8px">Alle anstehenden als .ics-Datei</button>
+      </section>
+    </div>
+  </div>
+  <p class="foot">Version <span id="ver"></span> · <span id="offState">Offline-Modus wird vorbereitet …</span></p>
+  <a class="btn primary block fab" href="#neu" id="addBtn">+ Wettkampf eintragen</a>
+</div>
+
+<div id="viewForm" class="narrow" hidden>
+  <a class="back" href="#" id="cancelTop">Abbrechen</a>
+  <h1 id="formHead">Wettkampf eintragen</h1>
+  <form id="form" novalidate autocomplete="off">
+    <section>
+      <span class="fl" style="margin-top:0">Wettkampfart</span>
+      <div class="seg" id="iKind" role="group" aria-label="Wettkampfart">
+        <button type="button" data-v="meet">Sportfest</button>
+        <button type="button" data-v="champ">Meisterschaft</button>
+        <button type="button" data-v="other">Sonstiges</button>
+      </div>
+      <div id="champBox" hidden>
+        <label class="fl" for="iChampSel">Meisterschaft</label>
+        <select id="iChampSel"></select>
+        <div id="champNewBox" hidden>
+          <label class="fl" for="iChamp">Name der Meisterschaft</label>
+          <input type="text" id="iChamp" maxlength="60" placeholder="z. B. Bezirksmeisterschaft">
+        </div>
+      </div>
+      <label class="fl" for="iName" id="iNameLbl">Name</label>
+      <input type="text" id="iName" maxlength="100" placeholder="z. B. Abendsportfest Pfungstadt">
+      <div class="grid2">
+        <div>
+          <label class="fl" for="iDate">Datum</label>
+          <input type="date" id="iDate" required>
+        </div>
+        <div>
+          <label class="fl" for="iEnd">bis (mehrtägig)</label>
+          <input type="date" id="iEnd">
+        </div>
+      </div>
+      <label class="fl" for="iPlace">Ort</label>
+      <input type="text" id="iPlace" maxlength="80" placeholder="z. B. Pfungstadt, Sportpark">
+      <span class="fl">Halle / Freiluft</span>
+      <div class="seg" id="iVenue" role="group" aria-label="Halle oder Freiluft">
+        <button type="button" data-v="indoor">Halle</button>
+        <button type="button" data-v="outdoor">Freiluft</button>
+      </div>
+      <label class="chk"><input type="checkbox" id="iIntl"> international (Altersklasse nach Alter am Wettkampftag)</label>
+    </section>
+    <section>
+      <label class="fl" for="iDeadline" style="margin-top:0">Meldeschluss</label>
+      <input type="date" id="iDeadline">
+      <label class="chk"><input type="checkbox" id="iEntered"> gemeldet</label>
+      <div id="athBox">
+        <span class="fl">Athleten</span>
+        <div class="athl" id="iAths"></div>
+      </div>
+      <label class="fl" for="iUrl">Link zur Ausschreibung (optional)</label>
+      <input type="url" id="iUrl" maxlength="300" placeholder="https://…" inputmode="url">
+      <label class="fl" for="iNote">Notiz (optional)</label>
+      <textarea id="iNote" maxlength="500" placeholder="z. B. Disziplinen, Anreise, Startpass"></textarea>
+    </section>
+    <section id="resBox" hidden></section>
+    <p class="err" id="formErr" role="alert"></p>
+    <div class="formbtns">
+      <button type="submit" class="btn primary">Speichern</button>
+      <button type="button" class="btn" id="cancel">Abbrechen</button>
+      <button type="button" class="btn danger" id="del" hidden>Löschen</button>
+    </div>
+  </form>
+</div>
+</main>
+<script src="../shared/config.js"></script>
+<script src="../shared/common.js"></script>
+<script src="../shared/cloud.js"></script>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id), esc=LA.esc;
+const MON=["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+const WD=["So","Mo","Di","Mi","Do","Fr","Sa"];
+const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const opt=(v,t,sel)=>'<option value="'+esc(v)+'"'+(v===sel?" selected":"")+">"+esc(t)+"</option>";
+let EV=LA.events(), ATH=LA.athletes(), R=LA.results();
+let editId=null, kind="meet", venue="outdoor", delTimer=null, fromList=false, listScroll=0;
+
+function reload(){ EV=LA.events(); ATH=LA.athletes(); R=LA.results(); }
+function persist(){ LA.saveEvents(EV); }
+const isPast=e=>(e.endDate||e.date)<today();
+const linked=e=>R.filter(r=>r.eventId===e.id).sort((a,b)=>a.date.localeCompare(b.date)||LA.discOrder(a.discipline)-LA.discOrder(b.discipline));
+
+/* ---------- Liste ---------- */
+function deadlineHtml(e){
+  if(!e.deadline) return "";
+  const d=LA.daysUntil(e.deadline,today()), when="Meldeschluss "+LA.fmtDate(e.deadline);
+  if(e.entered) return '<div class="dl done">✓ gemeldet · '+when+"</div>";
+  if(isPast(e)) return "";
+  if(d<0) return '<div class="dl over">'+when+" – abgelaufen</div>";
+  const rel=d===0?"heute":d===1?"morgen":"in "+d+" Tagen";
+  return '<div class="dl'+(d<=7?" soon":"")+'">'+when+" · "+rel+"</div>";
+}
+function card(e){
+  const d=new Date(e.date+"T12:00:00Z"), past=isPast(e), rs=linked(e);
+  const names=e.athleteIds.map(id=>LA.athleteName(id,ATH)).filter(Boolean);
+  const days=e.endDate?LA.fmtDate(e.endDate).slice(0,6):"";
+  let h='<div class="ev'+(past?" past":"")+'" data-id="'+esc(e.id)+'">'
+    +'<div class="cal"><b>'+d.getUTCDate()+"</b><span>"+MON[d.getUTCMonth()]+"</span><small>"+WD[d.getUTCDay()]+(d.getUTCFullYear()!==new Date().getFullYear()?" "+String(d.getUTCFullYear()).slice(2):"")+"</small></div>"
+    +'<div class="bd"><div class="nm">'+esc(LA.eventTitle(e))+"</div>"
+    +'<div class="meta">'+(e.kind==="champ"?'<span class="badge champ">'+esc(LA.eventType(e))+"</span>":'<span class="badge">'+esc(LA.eventType(e))+"</span>")
+    +'<span class="badge '+e.venue+'">'+(e.venue==="indoor"?"Halle":"Freiluft")+"</span>"+(e.intl?'<span class="badge">international</span>':"")
+    +(e.place?"<span>"+esc(e.place)+"</span>":"")+(days?"<span>bis "+days+"</span>":"")+"</div>"
+    +deadlineHtml(e)
+    +(names.length?'<div class="who">'+esc(names.join(", "))+"</div>":"");
+  if(rs.length) h+='<div class="rs">'+rs.map(r=>"<div><span>"+esc((ATH.length>1?LA.athleteName(r.athleteId,ATH)+" · ":"")+r.discipline)+(r.place?" · Platz "+r.place:"")+"</span><b>"+esc(r.mark)+" "+LA.markUnit(r)+"</b></div>").join("")+"</div>";
+  h+='<div class="acts">'+(e.date<=today()?'<a class="btn'+(rs.length?"":" primary")+'" href="../ergebnisse/#neu/wk/'+encodeURIComponent(e.id)+'" data-stop>Ergebnis eintragen</a>':"")
+    +(!past?'<button type="button" class="btn" data-ics="'+esc(e.id)+'">Kalender</button>':"")
+    +(e.url?'<a class="btn" href="'+esc(e.url)+'" target="_blank" rel="noopener" data-stop>Ausschreibung</a>':"")+"</div>";
+  return h+"</div></div>";
+}
+function renderList(){
+  const up=EV.filter(e=>!isPast(e)), past=EV.filter(isPast).reverse();
+  let h="", mon="";
+  up.forEach(e=>{ const m=e.date.slice(0,7); if(m!==mon){ mon=m; const d=new Date(e.date+"T12:00:00Z");
+    h+='<div class="mhead"><span>'+["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"][d.getUTCMonth()]+" "+d.getUTCFullYear()+"</span></div>"; }
+    h+=card(e); });
+  $("upcoming").innerHTML=h||'<p class="empty">Keine anstehenden Wettkämpfe.<br>Mit „+ Wettkampf eintragen“ geht es los.</p>';
+  $("pastBox").hidden=!past.length;
+  $("pastHead").textContent="Vergangene Wettkämpfe ("+past.length+")";
+  $("past").innerHTML=past.map(card).join("");
+  renderAbo();
+}
+function onListClick(e){
+  const ics=e.target.closest("[data-ics]");
+  if(ics){ e.stopPropagation(); const ev=EV.find(x=>x.id===ics.dataset.ics); if(ev) downloadICS([ev],LA.eventTitle(ev)); return; }
+  if(e.target.closest("[data-stop]")) return;
+  const c=e.target.closest(".ev"); if(c) go("#bearbeiten/"+encodeURIComponent(c.dataset.id));
+}
+$("upcoming").addEventListener("click",onListClick);
+$("past").addEventListener("click",onListClick);
+
+/* ---------- Apple-Kalender ---------- */
+function fileName(t){ return (t.normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/ß/g,"ss").replace(/[^A-Za-z0-9]+/g,"-").replace(/^-|-$/g,"").toLowerCase()||"wettkampf")+".ics"; }
+async function downloadICS(list,title){
+  const r=await LA.shareOrDownload(fileName(title),"text/calendar",LA.eventsToICS(list));
+  if(r!=="aborted") $("aboMsg").textContent=r==="shared"?"Datei geteilt – zum Übernehmen in der Dateien-App antippen.":"Datei gespeichert – zum Übernehmen öffnen.";
+}
+$("icsAll").addEventListener("click",()=>{ const up=EV.filter(e=>!isPast(e)); if(!up.length){ $("aboMsg").textContent="Keine anstehenden Wettkämpfe."; return; } downloadICS(up,"wettkaempfe"); });
+
+let abo=null, aboErr="";
+function renderAbo(){
+  const c=LA.cloud&&LA.cloud.status();
+  if(!c||!c.configured||!c.loggedIn){ $("aboBox").innerHTML='<p class="note" style="margin:0">Dafür bei der <a class="link" href="../#bkHead">Cloud-Sicherung</a> anmelden – das Abo liest die Wettkämpfe aus der Cloud.</p>'; return; }
+  if(!abo){ $("aboBox").innerHTML='<button class="btn primary" id="aboMake">Kalender-Abo einrichten</button>'+(aboErr?'<p class="err">'+esc(aboErr)+"</p>":""); return; }
+  $("aboBox").innerHTML='<a class="btn primary" href="'+esc(abo.webcal)+'">Im Kalender abonnieren</a>'
+    +'<div class="feed" id="aboUrl">'+esc(abo.https)+"</div>"
+    +'<div class="row" style="margin-top:8px"><button class="btn" id="aboCopy">Link kopieren</button><button class="btn danger" id="aboRenew">Neuer Link</button></div>'
+    +'<p class="hint">Wer diesen Link hat, sieht deine Wettkämpfe – nicht weitergeben. „Neuer Link“ macht den alten ungültig.</p>';
+}
+async function loadAbo(create,renew){
+  try{ abo=await LA.cloud.calendarLink({create,renew}); aboErr=""; }
+  catch(e){ aboErr=e.code==="offline"?"Keine Internetverbindung.":"Kalender-Abo nicht verfügbar ("+(e.message||"Fehler")+")."; }
+  renderAbo();
+}
+$("aboBox").addEventListener("click",async e=>{
+  if(e.target.id==="aboMake"){ e.target.disabled=true; await LA.cloud.sync({force:true}); await loadAbo(true,false);
+    if(abo) $("aboMsg").textContent="Jetzt „Im Kalender abonnieren“ antippen und bestätigen."; }
+  if(e.target.id==="aboCopy"){ try{ await navigator.clipboard.writeText(abo.https); $("aboMsg").textContent="Link kopiert."; }catch(err){ $("aboMsg").textContent="Kopieren nicht möglich – Link markieren und kopieren."; } }
+  if(e.target.id==="aboRenew"){
+    if(e.target.dataset.armed!=="1"){ e.target.dataset.armed="1"; e.target.textContent="Wirklich? Alter Link wird ungültig"; e.target.classList.add("armed"); return; }
+    await loadAbo(true,true); $("aboMsg").textContent="Neuer Link erstellt. Das alte Abo im Kalender löschen und neu abonnieren.";
+  }
+});
+
+/* ---------- Formular ---------- */
+function syncForm(){
+  [...$("iKind").querySelectorAll("button")].forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===kind)));
+  [...$("iVenue").querySelectorAll("button")].forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===venue)));
+  $("champBox").hidden=kind!=="champ";
+  $("champNewBox").hidden=kind!=="champ"||$("iChampSel").value!=="__new";
+  $("iNameLbl").textContent=kind==="meet"?"Name":"Name (optional)";
+  $("iName").placeholder=kind==="champ"?"z. B. Hessische Meisterschaften Kassel":kind==="meet"?"z. B. Abendsportfest Pfungstadt":"z. B. Ligawettkampf";
+}
+function fillChamp(sel){
+  const list=LA.championships(R);
+  if(sel&&!list.includes(sel)) list.push(sel);
+  $("iChampSel").innerHTML=list.map(c=>opt(c,c,sel||"Hessische Meisterschaft")).join("")+opt("__new","Andere …",sel);
+}
+function disarmDel(){ const b=$("del"); b.dataset.armed=""; b.textContent="Löschen"; b.classList.remove("armed"); clearTimeout(delTimer); }
+function openForm(id){
+  reload();
+  const e=id?EV.find(x=>x.id===id):null;
+  if(id&&!e){ go("#",true); return; }
+  editId=e?e.id:null;
+  $("formHead").textContent=e?"Wettkampf bearbeiten":"Wettkampf eintragen";
+  $("del").hidden=!e; disarmDel(); $("formErr").textContent="";
+  kind=e?e.kind:"meet"; venue=e?e.venue:(new Date().getMonth()<3||new Date().getMonth()>9?"indoor":"outdoor");
+  fillChamp(e&&e.kind==="champ"?LA.canonChamp(e.champ):"");
+  $("iChamp").value="";
+  $("iName").value=e?e.name:""; $("iDate").value=e?e.date:""; $("iEnd").value=e&&e.endDate?e.endDate:"";
+  $("iPlace").value=e?e.place:""; $("iIntl").checked=!!(e&&e.intl);
+  $("iDeadline").value=e&&e.deadline?e.deadline:""; $("iEntered").checked=!!(e&&e.entered);
+  $("iUrl").value=e?e.url:""; $("iNote").value=e?e.note:"";
+  const sel=e?e.athleteIds:(ATH.length===1?[ATH[0].id]:[]);
+  $("athBox").hidden=!ATH.length;
+  $("iAths").innerHTML=ATH.map(a=>'<label class="chk"><input type="checkbox" value="'+esc(a.id)+'"'+(sel.includes(a.id)?" checked":"")+"> "+esc(a.name)+"</label>").join("");
+  const rs=e?linked(e):[];
+  $("resBox").hidden=!e||e.date>today();
+  if(e) $("resBox").innerHTML='<h2>Ergebnisse</h2>'+(rs.length?'<div class="ev" style="padding:0;cursor:default;display:block"><div class="rs" style="border:0;margin:0;padding:0">'
+      +rs.map(r=>"<div><span>"+esc((ATH.length>1?LA.athleteName(r.athleteId,ATH)+" · ":"")+r.discipline)+(r.place?" · Platz "+r.place:"")+"</span><b>"+esc(r.mark)+" "+LA.markUnit(r)+"</b></div>").join("")+"</div></div>":'<p class="note" style="margin-top:0">Noch keine Ergebnisse zugeordnet.</p>')
+    +'<a class="btn" style="margin-top:10px" href="../ergebnisse/#neu/wk/'+encodeURIComponent(e.id)+'">Ergebnis eintragen</a>';
+  syncForm();
+}
+$("iKind").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b){ kind=b.dataset.v; syncForm(); } });
+$("iVenue").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b){ venue=b.dataset.v; syncForm(); } });
+$("iChampSel").addEventListener("change",()=>{ const v=$("iChampSel").value; if(LA.INTL_CHAMPS.includes(v)) $("iIntl").checked=true; syncForm(); if(v==="__new") $("iChamp").focus(); });
+$("iDate").addEventListener("change",()=>{ if($("iEnd").value&&$("iEnd").value<$("iDate").value) $("iEnd").value=""; });
+
+$("form").addEventListener("submit",ev=>{
+  ev.preventDefault();
+  const err=m=>{ $("formErr").textContent=m; };
+  const date=$("iDate").value, end=$("iEnd").value, dl=$("iDeadline").value;
+  if(!LA.isIsoDate(date)) return err("Datum fehlt.");
+  if(end&&end<date) return err("„bis“ liegt vor dem Datum.");
+  let champ="";
+  if(kind==="champ"){
+    champ=$("iChampSel").value;
+    if(champ==="__new"){ champ=$("iChamp").value.trim(); if(!champ) return err("Name der Meisterschaft fehlt.");
+      champ=LA.canonChamp(LA.championships(R).find(c=>c.toLowerCase()===champ.toLowerCase())||champ); }
+  }
+  const name=$("iName").value.trim();
+  if(kind==="meet"&&!name) return err("Name des Sportfests fehlt.");
+  if(dl&&dl>date) return err("Meldeschluss liegt nach dem Wettkampf.");
+  const url=$("iUrl").value.trim();
+  if(url&&!/^https?:\/\/\S+\.\S+/i.test(url)) return err("Link muss mit https:// beginnen.");
+  const now=new Date().toISOString();
+  const rec={kind,champ,name,date,endDate:end&&end>date?end:null,place:$("iPlace").value.trim(),venue,intl:$("iIntl").checked,
+    deadline:dl||null,entered:$("iEntered").checked,athleteIds:[...$("iAths").querySelectorAll("input:checked")].map(x=>x.value),
+    url,note:$("iNote").value.trim(),updatedAt:now};
+  if(editId) Object.assign(EV.find(x=>x.id===editId),rec);
+  else EV.push(Object.assign({id:LA.newId("e"),createdAt:now},rec));
+  persist(); closeForm();
+});
+$("del").addEventListener("click",()=>{
+  const b=$("del");
+  if(b.dataset.armed!=="1"){ b.dataset.armed="1"; b.textContent="Wirklich löschen?"; b.classList.add("armed"); delTimer=setTimeout(disarmDel,4000); return; }
+  EV=EV.filter(x=>x.id!==editId); persist(); LA.trackDelete("settings","event:"+editId);
+  // zugeordnete Ergebnisse bleiben erhalten, nur die Verknüpfung entfällt
+  let ch=false; R.forEach(r=>{ if(r.eventId===editId){ delete r.eventId; r.updatedAt=new Date().toISOString(); ch=true; } }); if(ch) LA.saveResults(R);
+  closeForm();
+});
+$("cancel").addEventListener("click",closeForm);
+$("cancelTop").addEventListener("click",e=>{ e.preventDefault(); closeForm(); });
+
+/* ---------- Navigation ---------- */
+function go(hash,replace){ if(location.hash===hash||(hash==="#"&&!location.hash)) return route(); if(replace) location.replace(hash); else location.hash=hash; }
+function closeForm(){ if(fromList) history.back(); else go("#",true); }
+$("addBtn").addEventListener("click",e=>{ e.preventDefault(); go("#neu"); });
+function route(){
+  const h=location.hash, m=h.match(/^#bearbeiten\/(.+)$/);
+  if(h==="#neu"||m){
+    if(!$("viewList").hidden){ listScroll=window.scrollY; fromList=true; }
+    $("viewList").hidden=true; $("viewForm").hidden=false;
+    openForm(m?decodeURIComponent(m[1]):null); window.scrollTo(0,0);
+  } else {
+    const was=!$("viewForm").hidden;
+    $("viewForm").hidden=true; $("viewList").hidden=false; fromList=false;
+    reload(); renderList(); if(was) window.scrollTo(0,listScroll);
+  }
+}
+window.addEventListener("hashchange",route);
+window.addEventListener("la:synced",()=>{ reload(); if(!$("viewList").hidden) renderList(); });
+window.addEventListener("pageshow",e=>{ if(e.persisted){ reload(); route(); } });
+if(LA.cloud){ let was=LA.cloud.status().loggedIn; if(was) loadAbo(false,false);
+  LA.cloud.onStatus(s=>{ if(s.loggedIn!==was){ was=s.loggedIn; if(was) loadAbo(false,false); else { abo=null; renderAbo(); } } }); }
+
+$("ver").textContent=LA.VERSION;
+route();
+LA.registerOffline("../",s=>{ $("offState").textContent=s; });
+})();
+</script>
+</body>
+</html>

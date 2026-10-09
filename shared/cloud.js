@@ -10,6 +10,8 @@
   const K = LA.KEYS;
   const OVERLAP_MS = 5 * 60 * 1000; // Puffer beim Abholen gegen knapp verpasste Änderungen
   const PAGE = 1000;
+  // Wettkampfkalender: als kind "settings" mit id "event:<id>" – so ignorieren ältere App-Versionen diese Zeilen
+  const EV = "event:";
   // Datenbank-Limit des Supabase-Tarifs (Free: 500 MB) – über LA_CLOUD.dbLimitMB anpassbar
   const DB_LIMIT = (Number(CFG.dbLimitMB) > 0 ? Number(CFG.dbLimitMB) : 500) * 1024 * 1024;
 
@@ -34,6 +36,7 @@
     let n = 0;
     LA.athletes().forEach((a) => { if (pushed["athlete:" + a.id] !== ms(a.updatedAt)) n++; });
     LA.results().forEach((r) => { if (pushed["result:" + r.id] !== ms(r.updatedAt)) n++; });
+    LA.events().forEach((e) => { if (pushed["settings:" + EV + e.id] !== ms(e.updatedAt)) n++; });
     n += (LA.load(K.deleted, []) || []).length;
     if (s.settingsHash !== settingsHash(LA.tempoSettings())) n++;
     return n;
@@ -198,10 +201,25 @@
   /* ---------- Abgleich ---------- */
   function applyRemote(rows, s) {
     const pushed = s.pushed || (s.pushed = {});
-    let ath = LA.athletes(), res = LA.results(), changedA = false, changedR = false, changedS = false;
+    let ath = LA.athletes(), res = LA.results(), changedA = false, changedR = false, changedS = false, changedE = false;
+    const evs = LA.load(K.events, []) || [];
     const tomb = LA.load(K.deleted, []) || [];
     rows.forEach((row) => {
       const t = ms(row.updated_at), key = row.kind + ":" + row.id;
+      if (row.kind === "settings" && row.id.startsWith(EV)) {
+        const id = row.id.slice(EV.length), i = evs.findIndex((x) => x.id === id), local = i >= 0 ? evs[i] : null;
+        if (local && ms(local.updatedAt) > t) return;
+        const lt = tomb.find((x) => x.kind === row.kind && x.id === row.id);
+        if (lt && ms(lt.at) > t) return;
+        if (row.deleted) { if (local) { evs.splice(i, 1); changedE = true; } }
+        else if (row.data) {
+          const rec = Object.assign({}, row.data, { id, updatedAt: new Date(t).toISOString() });
+          if (i >= 0) evs[i] = rec; else evs.push(rec);
+          changedE = true;
+        }
+        pushed[key] = t;
+        return;
+      }
       if (row.kind === "settings") {
         if (row.id === "tempo" && !row.deleted && row.data && t > (s.settingsAt || 0)) {
           const cur = LA.load(K.tempo, {}) || {};
@@ -228,7 +246,8 @@
     });
     if (changedA) localStorage.setItem(K.athletes, JSON.stringify(ath));
     if (changedR) localStorage.setItem(K.results, JSON.stringify(res));
-    return changedA || changedR || changedS;
+    if (changedE) localStorage.setItem(K.events, JSON.stringify(evs));
+    return changedA || changedR || changedS || changedE;
   }
 
   async function pull(sess, s) {
@@ -261,6 +280,7 @@
       if (!r.updatedAt) r.updatedAt = r.createdAt || new Date().toISOString();
       if (pushed["result:" + r.id] !== ms(r.updatedAt)) add("result", r.id, r, r.updatedAt);
     });
+    LA.events().forEach((e) => { if (pushed["settings:" + EV + e.id] !== ms(e.updatedAt)) add("settings", EV + e.id, e, e.updatedAt); });
     const tomb = LA.load(K.deleted, []) || [];
     tomb.forEach((x) => add(x.kind, x.id, null, x.at, true));
     const set = LA.tempoSettings(), h = settingsHash(set);
@@ -315,6 +335,30 @@
     timer = setTimeout(() => sync(), delay == null ? 2000 : delay);
   }
 
+  /* ---------- Kalender-Abo (Apple-Kalender, Outlook, Google) ---------- */
+  // Geheimer Link je Benutzer: Die Edge-Function "la-calendar" liefert damit die Wettkämpfe als iCalendar-Abo.
+  function newToken() {
+    const b = new Uint8Array(24); crypto.getRandomValues(b);
+    return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  const feedUrl = (tok) => URL_ + "/functions/v1/la-calendar?t=" + tok;
+  async function calendarLink(opts) {
+    const sess = await token();
+    let tok = null;
+    if (!(opts && opts.renew)) {
+      const rows = await http("/rest/v1/la_calendar_tokens?select=token", { token: sess.access_token });
+      tok = Array.isArray(rows) && rows[0] ? rows[0].token : null;
+    }
+    if (!tok && opts && opts.create) {
+      tok = newToken();
+      await http("/rest/v1/la_calendar_tokens?on_conflict=user_id", { method: "POST", token: sess.access_token,
+        body: [{ user_id: sess.user_id, token: tok }], headers: { Prefer: "resolution=merge-duplicates,return=minimal" } });
+    }
+    if (!tok) return null;
+    const https = feedUrl(tok);
+    return { https, webcal: https.replace(/^https?:/, "webcal:") };
+  }
+
   window.addEventListener("la:changed", (e) => {
     // Sprint-Tempo speichert bei jeder Bedienung; nur geänderte Stellschrauben sind relevant
     if (e.detail && e.detail.key === K.tempo && settingsHash(LA.tempoSettings()) === st().settingsHash) return;
@@ -324,5 +368,5 @@
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") schedule(300); });
   if (configured) setTimeout(() => sync(), 300);
 
-  LA.cloud = { configured, status, signIn, signUp, signOut, sync, storageInfo, requestPasswordReset, readRecoveryLink, updatePassword, onStatus: (fn) => { listeners.add(fn); return () => listeners.delete(fn); } };
+  LA.cloud = { configured, status, signIn, signUp, signOut, sync, storageInfo, calendarLink, requestPasswordReset, readRecoveryLink, updatePassword, onStatus: (fn) => { listeners.add(fn); return () => listeners.delete(fn); } };
 })();

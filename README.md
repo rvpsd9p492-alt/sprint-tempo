@@ -13,6 +13,9 @@ Offline-Web-App mit mehreren Leichtathletik-Modulen.
 - **Wettkampfergebnisse** (`ergebnisse/`) – Ergebnisse mit Datum, Disziplin, Halle/Freiluft, Ergebnis, Wind,
   Meisterschaft, Platzierung und Kommentar erfassen; Filter nach Jahr, Disziplin, Meisterschaft und Halle/Freiluft;
   Bestleistungen (PB/SB, ohne Rückenwind über +2,0 m/s); CSV-Export für Excel.
+- **Wettkampfkalender** (`kalender/`) – Wettkämpfe mit Wettkampfart (Sportfest, Meisterschaft, Sonstiges), Datum,
+  Ort, Halle/Freiluft und Meldeschluss; „Ergebnis eintragen“ übernimmt die Angaben ins Ergebnisformular und verknüpft
+  das Ergebnis (`eventId`). Apple-Kalender: als Abo (Edge-Function `la-calendar`) oder als `.ics`-Datei.
 
 ## Auf iPhone/iPad installieren
 
@@ -39,7 +42,12 @@ Danach:
 2. Danach unter **Authentication → Sign In / Providers** „Allow new users to sign up“ ausschalten, damit niemand
    sonst Konten in deinem Projekt anlegt.
 
-Abgleich: je Athlet, Ergebnis und Einstellung; neuere Änderung gewinnt (auch serverseitig per Trigger),
+Kalender-Abo: Migration `20261009100000_la_calendar_feed.sql` (Tabelle `la_calendar_tokens`, Funktion
+`la_calendar_feed`) und Edge-Function `supabase/functions/la-calendar` (ohne JWT-Prüfung – der geheime Link ist die
+Berechtigung). Wettkämpfe liegen in `la_records` als `kind = 'settings'`, `id = 'event:<id>'`, damit ältere
+App-Versionen sie ignorieren.
+
+Abgleich: je Athlet, Ergebnis, Wettkampf und Einstellung; neuere Änderung gewinnt (auch serverseitig per Trigger),
 Löschungen werden übertragen. Offline-Änderungen werden beim nächsten Online-Start nachgeholt.
 
 ## Entwicklung

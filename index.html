@@ -108,10 +108,17 @@ h3:first-of-type{margin-top:4px}
       </span>
       <span class="go" aria-hidden="true">›</span>
     </a>
-    <div class="tile soon" aria-hidden="true">
-      <span class="ic"></span>
-      <span class="tx"><h2>Weitere Module</h2><span class="d">folgen</span></span>
-    </div>
+    <a class="tile" href="kalender/">
+      <span class="ic" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="7" width="22" height="20" rx="3"/><path d="M5 13h22M11 4v6M21 4v6M11 19h3M18 19h3M11 23h3"/></svg>
+      </span>
+      <span class="tx">
+        <h2>Wettkampfkalender</h2>
+        <span class="d">Termine, Meldeschluss, Apple-Kalender</span>
+        <span class="st" id="stCal"></span>
+      </span>
+      <span class="go" aria-hidden="true">›</span>
+    </a>
   </nav>
 
   <div class="hubcols">
@@ -193,6 +200,11 @@ function render(){
     const last=res.map(r=>r.date).sort().pop();
     $("stRes").textContent=res.length+" Ergebnis"+(res.length===1?"":"se")+" · zuletzt "+LA.fmtDate(last);
   } else $("stRes").textContent="";
+  const t=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  const up=LA.events().filter(e=>(e.endDate||e.date)>=t), nx=up[0];
+  const dl=up.filter(e=>e.deadline&&!e.entered&&e.deadline>=t).sort((a,b)=>a.deadline.localeCompare(b.deadline))[0];
+  $("stCal").textContent=nx?"Nächster: "+LA.fmtDate(nx.date).slice(0,6)+" "+LA.eventTitle(nx)
+    +(dl?" · Meldeschluss "+(LA.daysUntil(dl.deadline,t)===0?"heute":"in "+LA.plural(LA.daysUntil(dl.deadline,t),"Tag","Tagen")):""):"";
 
   const s=LA.backupStatus();
   $("bkInfo").textContent=s.cloudSafe
@@ -221,10 +233,10 @@ $("impFile").addEventListener("change",async e=>{
   let b;
   try{ b=LA.parseBackup(await f.text()); }
   catch(err){ $("bkMsg").innerHTML='<span class="warn">Datei ist keine gültige Sicherung.</span>'; return; }
-  const na=b.tempo&&Array.isArray(b.tempo.athletes)?b.tempo.athletes.length:0, nr=b.results.length;
+  const na=b.athletes.length, nr=b.results.length;
   if(!confirm("Sicherung mit "+na+" Athlet"+(na===1?"":"en")+" und "+nr+" Ergebnis"+(nr===1?"":"sen")+" übernehmen?\n\nVorhandene Einträge bleiben erhalten, gleiche Einträge werden aktualisiert.")) return;
   const r=LA.applyBackup(b);
-  $("bkMsg").innerHTML='<span class="ok">Übernommen: '+r.athletes+" Athlet"+(r.athletes===1?"":"en")+", "+r.results+" Ergebnis"+(r.results===1?"":"se")+".</span>";
+  $("bkMsg").innerHTML='<span class="ok">Übernommen: '+r.athletes+" Athlet"+(r.athletes===1?"":"en")+", "+r.results+" Ergebnis"+(r.results===1?"":"se")+(r.events?", "+LA.plural(r.events,"Wettkampf","Wettkämpfe"):"")+".</span>";
   render();
 });
 window.addEventListener("pageshow",render);
