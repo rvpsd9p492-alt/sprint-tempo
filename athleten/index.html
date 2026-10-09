@@ -135,15 +135,15 @@ function titleHtml(a,res){
   if(TVIEW==="champ"){
     // nach Meisterschaft: höchstwertige zuerst (WM … Kreis), eigene danach; innerhalb neueste zuerst
     // eigene internationale Meisterschaften direkt hinter der EM, andere eigene am Ende
-    const rank=nm=>{ const k=LA.champRank(nm); if(k>=0) return k*10; return t.some(r=>r.champ.trim()===nm&&LA.isIntlChamp(r))?LA.champRank("Europameisterschaft")*10-1:-1; };
-    const names=[...new Set(t.map(r=>r.champ.trim()))].sort((x,y)=>rank(y)-rank(x)||x.localeCompare(y,"de"));
-    body=names.map(nm=>{ const l=t.filter(r=>r.champ.trim()===nm).sort((x,z)=>z.date.localeCompare(x.date)||x.place-z.place);
+    const rank=nm=>{ const k=LA.champRank(nm); if(k>=0) return k*10; return t.some(r=>LA.canonChamp(r.champ)===nm&&LA.isIntlChamp(r))?LA.champRank("Europameisterschaft")*10-1:-1; };
+    const names=[...new Set(t.map(r=>LA.canonChamp(r.champ)))].sort((x,y)=>rank(y)-rank(x)||x.localeCompare(y,"de"));
+    body=names.map(nm=>{ const l=t.filter(r=>LA.canonChamp(r.champ)===nm).sort((x,z)=>z.date.localeCompare(x.date)||x.place-z.place);
       return '<div class="ty"><span>'+esc(nm)+"</span><span>"+count(l)+"</span></div>"+l.map(r=>line(r,esc(r.discipline),LA.fmtDate(r.date))).join(""); }).join("");
   } else {
     // nach Jahr: neuestes zuerst, innerhalb des Jahres chronologisch
     const years=[...new Set(t.map(r=>r.date.slice(0,4)))].sort().reverse();
     body=years.map(y=>{ const l=t.filter(r=>r.date.slice(0,4)===y).sort((x,z)=>x.date.localeCompare(z.date)||x.place-z.place);
-      return '<div class="ty"><span>'+y+"</span><span>"+count(l)+"</span></div>"+l.map(r=>line(r,esc(r.champ.trim())+" · "+esc(r.discipline),LA.fmtDate(r.date).slice(0,6))).join(""); }).join("");
+      return '<div class="ty"><span>'+y+"</span><span>"+count(l)+"</span></div>"+l.map(r=>line(r,esc(LA.canonChamp(r.champ))+" · "+esc(r.discipline),LA.fmtDate(r.date).slice(0,6))).join(""); }).join("");
   }
   return '<div class="tit"><h3>Titel &amp; Medaillen<span>'+count(t)+"</span></h3>"
     +'<div class="tview" role="group" aria-label="Ansicht"><button type="button" data-tv="year" aria-pressed="'+(TVIEW==="year")+'">Nach Jahr</button>'

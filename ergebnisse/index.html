@@ -320,7 +320,7 @@ function opt(v,label,sel){return '<option value="'+esc(v)+'"'+(v===sel?" selecte
 function buildFilters(){
   const years=[...new Set(R.map(r=>r.date.slice(0,4)))].sort().reverse();
   const discs=[...new Set(R.map(r=>r.discipline))].sort((a,b)=>discOrder(a)-discOrder(b)||a.localeCompare(b,"de"));
-  const champs=[...new Set(R.filter(isChamp).map(r=>r.champ.trim()))].sort((a,b)=>a.localeCompare(b,"de"));
+  const champs=[...new Set(R.filter(isChamp).map(r=>LA.canonChamp(r.champ)))].sort((a,b)=>a.localeCompare(b,"de"));
   if(F.ath&&F.ath!=="__none"&&!ATH.some(a=>a.id===F.ath)) F.ath="";
   const hasNone=R.some(r=>!r.athleteId);
   $("fAth").innerHTML=opt("","Alle",F.ath)+ATH.map(a=>opt(a.id,a.name,F.ath)).join("")+(hasNone||F.ath==="__none"?opt("__none","Ohne Athlet",F.ath):"");
@@ -344,7 +344,7 @@ function passes(r,ignoreDisc){
     (ignoreDisc||!F.disc||r.discipline===F.disc)&&
     (!F.venue||r.venue===F.venue)&&
     (!F.ak||akOf(r)===F.ak)&&
-    (!F.champ||(F.champ==="__yes"?isChamp(r):F.champ==="__no"?!isChamp(r):(r.champ||"").trim()===F.champ));
+    (!F.champ||(F.champ==="__yes"?isChamp(r):F.champ==="__no"?!isChamp(r):LA.canonChamp(r.champ)===F.champ));
 }
 function filtered(){
   return R.filter(r=>passes(r,false))
@@ -476,9 +476,9 @@ $("csvFile").addEventListener("change",async e=>{
       athleteId=a.id; }
     else if(ATH.length===1) athleteId=ATH[0].id;
     else warn.push("Spalte Athlet leer – Ergebnis wird ohne Athlet importiert (später zuordnen)");
-    let champ=cell(r,"champ"); champ=champ?(LA.championships(R).find(c=>c.toLowerCase()===champ.toLowerCase())||champ):"";
+    let champ=cell(r,"champ"); champ=champ?LA.canonChamp(LA.championships(R).find(c=>c.toLowerCase()===champ.toLowerCase())||champ):"";
     const rec={id:LA.newId("r"),athleteId,date,discipline:(DISC.has(disc)?disc:(known?known.discipline:disc)),kind,venue,mark:m.mark,value:m.value,wind,
-      hand:kind==="t"&&m.value!=null&&yes(cell(r,"hand")),meet:normMeet(cell(r,"meet")).slice(0,100),champ,intl:yes(cell(r,"intl"))||LA.INTL_CHAMPS.includes(champ),
+      hand:kind==="t"&&m.value!=null&&yes(cell(r,"hand")),meet:normMeet(cell(r,"meet")).slice(0,100),champ,intl:yes(cell(r,"intl"))||LA.isIntlChamp({champ}),
       place:pRaw?+pRaw:null,comment:cell(r,"comment").slice(0,1000),createdAt:now,updatedAt:now};
     const prev=seen.get(key(rec));
     if(prev){
@@ -689,7 +689,7 @@ function openForm(id){
   $("meetList").innerHTML=meets().map(m=>'<option value="'+esc(m)+'">').join("");
   $("iPlace").value=r&&r.place?r.place:"";
   $("iComment").value=r?r.comment||"":"";
-  fillChampSelect(r?(r.champ||"").trim():""); syncForm(); updAk();
+  fillChampSelect(r?LA.canonChamp(r.champ):""); syncForm(); updAk();
 }
 function updAk(){
   const a=ATH.find(x=>x.id===$("iAth").value), d=$("iDate").value, intl=$("iIntl").checked;
@@ -722,7 +722,7 @@ $("form").addEventListener("submit",e=>{
   let champ=$("iChampSel").value;
   if(champ==="__new"){
     champ=$("iChamp").value.trim(); if(!champ) return err("Name der neuen Meisterschaft fehlt.");
-    champ=LA.championships(R).find(c=>c.toLowerCase()===champ.toLowerCase())||champ; // vorhandene Schreibweise übernehmen
+    champ=LA.canonChamp(LA.championships(R).find(c=>c.toLowerCase()===champ.toLowerCase())||champ); // vorhandene Schreibweise übernehmen
   }
   const pRaw=$("iPlace").value.trim().replace(/\.$/,"");
   if(pRaw&&!/^\d{1,4}$/.test(pRaw)) return err("Platzierung als Zahl, z. B. 3.");

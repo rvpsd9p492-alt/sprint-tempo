@@ -188,15 +188,18 @@
   const CHAMPIONSHIPS = ["Kreismeisterschaft", "Südhessische Meisterschaft", "Hessische Meisterschaft",
     "Süddeutsche Meisterschaft", "Deutsche Meisterschaft", "Europameisterschaft", "Weltmeisterschaft"];
   const INTL_CHAMPS = ["Europameisterschaft", "Weltmeisterschaft"];
-  const champRank = (c) => { const i = CHAMPIONSHIPS.indexOf(String(c || "").trim()); return i < 0 ? -1 : i; };
+  /** Feste Meisterschaft auch bei Plural oder anderer Groß-/Kleinschreibung erkennen ("Hessische Meisterschaften"). */
+  const champKey = (c) => String(c || "").trim().toLowerCase().replace(/\s+/g, " ").replace(/meisterschaften$/, "meisterschaft");
+  const canonChamp = (c) => { const t = String(c || "").trim().replace(/\s+/g, " "); return CHAMPIONSHIPS.find((x) => champKey(x) === champKey(t)) || t; };
+  const champRank = (c) => CHAMPIONSHIPS.indexOf(canonChamp(c));
   /** Alle Meisterschaftsnamen: feste Liste + in Ergebnissen verwendete eigene Einträge. */
   function championships(resList) {
-    const extra = [...new Set((resList || results()).map((r) => String(r.champ || "").trim())
+    const extra = [...new Set((resList || results()).map((r) => canonChamp(r.champ))
       .filter((c) => c && !CHAMPIONSHIPS.includes(c)))].sort((a, b) => a.localeCompare(b, "de"));
     return CHAMPIONSHIPS.concat(extra);
   }
   /** Internationale Meisterschaft: EM/WM oder Meisterschaft mit Schalter „international“. */
-  const isIntlChamp = (r) => { const c = String(r.champ || "").trim(); return !!c && (INTL_CHAMPS.includes(c) || !!r.intl); };
+  const isIntlChamp = (r) => { const c = canonChamp(r.champ); return !!c && (INTL_CHAMPS.includes(c) || !!r.intl); };
   /** Titel & Medaillen: Meisterschaftsergebnisse mit Platz 1–3, bei internationalen Meisterschaften jede Platzierung. */
   function titles(athleteId, resList) {
     return (resList || results()).filter((r) => r.athleteId === athleteId && String(r.champ || "").trim() && r.place >= 1
@@ -506,8 +509,8 @@
     athletes, saveAthletes, upsertAthlete, deleteAthlete, athleteName,
     results, saveResults, isWindy, isLegal,
     DISCIPLINE_GROUPS, DISC, discOrder, normalizeDiscipline, normalizeStoredDisciplines, better, markUnit, bestMarks, ageClass, resultClass, isIsoDate, exactAge,
-    CHAMPIONSHIPS, INTL_CHAMPS, champRank, isIntlChamp, championships, titles, readTextFile, parseCSV, toCSV, headerIndex, parseDate, importPreview, columnCountWarnings,
+    CHAMPIONSHIPS, INTL_CHAMPS, canonChamp, champRank, isIntlChamp, championships, titles, readTextFile, parseCSV, toCSV, headerIndex, parseDate, importPreview, columnCountWarnings,
     autoPBs, effectivePBs, setManual, resetToRecorded,
     backupStatus, exportBackup, parseBackup, applyBackup, shareOrDownload,
-    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.14" };
+    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.15" };
 })();
