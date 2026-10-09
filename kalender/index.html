@@ -46,6 +46,13 @@
 .chk input{width:22px;height:22px;accent-color:var(--track)}
 .athl{display:flex;flex-wrap:wrap;gap:4px 16px}
 .feed{word-break:break-all;font-size:13px;color:var(--muted);background:var(--bg);border-radius:8px;padding:8px 10px;margin-top:8px}
+.dg{font:600 13px "Barlow",sans-serif;color:var(--muted);margin:10px 0 4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{border:1px solid var(--line);background:transparent;color:var(--ink);font:600 14px "Barlow",sans-serif;padding:7px 11px;border-radius:18px;cursor:pointer;min-height:36px}
+.chips button[aria-pressed="true"]{background:var(--track);border-color:var(--track);color:var(--track-ink)}
+.chips button[aria-pressed="true"]::before{content:"✓ "}
+.ev .ds{font-size:14px;margin-top:4px}
+.ev .ds .ok{font-weight:600}
 .formbtns{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
 .formbtns .primary{flex:1 1 auto}
 @media (min-width:740px){ .evcols{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:0 16px;align-items:start} }
@@ -121,6 +128,17 @@
       <label class="chk"><input type="checkbox" id="iIntl"> international (Altersklasse nach Alter am Wettkampftag)</label>
     </section>
     <section>
+      <h2 style="margin-bottom:2px">Disziplinen</h2>
+      <p class="hint" style="margin-top:0">Gemeldete Disziplinen ankreuzen – bei der Ergebniseingabe werden sie zur Auswahl angeboten.</p>
+      <div id="iDiscs"></div>
+      <div class="dg">Weitere Disziplin</div>
+      <select id="iDiscMore" aria-label="Weitere Disziplin hinzufügen"></select>
+      <div id="discNewBox" class="row" style="margin-top:8px;flex-wrap:nowrap" hidden>
+        <input type="text" id="iDiscNew" maxlength="40" placeholder="z. B. 300 m Hürden, Schlagball">
+        <button type="button" class="btn" id="discNewAdd">Hinzufügen</button>
+      </div>
+    </section>
+    <section>
       <label class="fl" for="iDeadline" style="margin-top:0">Meldeschluss</label>
       <input type="date" id="iDeadline">
       <label class="chk"><input type="checkbox" id="iEntered"> gemeldet</label>
@@ -155,6 +173,7 @@ const WD=["So","Mo","Di","Mi","Do","Fr","Sa"];
 const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
 const opt=(v,t,sel)=>'<option value="'+esc(v)+'"'+(v===sel?" selected":"")+">"+esc(t)+"</option>";
 let EV=LA.events(), ATH=LA.athletes(), R=LA.results();
+let discSel=new Set();
 let editId=null, kind="meet", venue="outdoor", delTimer=null, fromList=false, listScroll=0;
 
 function reload(){ EV=LA.events(); ATH=LA.athletes(); R=LA.results(); }
@@ -183,6 +202,7 @@ function card(e){
     +'<span class="badge '+e.venue+'">'+(e.venue==="indoor"?"Halle":"Freiluft")+"</span>"+(e.intl?'<span class="badge">international</span>':"")
     +(e.place?"<span>"+esc(e.place)+"</span>":"")+(days?"<span>bis "+days+"</span>":"")+"</div>"
     +deadlineHtml(e)
+    +(e.disciplines.length?'<div class="ds">'+e.disciplines.map(d=>rs.some(r=>r.discipline===d)?'<span class="ok">✓ '+esc(d)+"</span>":esc(d)).join(" · ")+"</div>":"")
     +(names.length?'<div class="who">'+esc(names.join(", "))+"</div>":"");
   if(rs.length) h+='<div class="rs">'+rs.map(r=>"<div><span>"+esc((ATH.length>1?LA.athleteName(r.athleteId,ATH)+" · ":"")+r.discipline)+(r.place?" · Platz "+r.place:"")+"</span><b>"+esc(r.mark)+" "+LA.markUnit(r)+"</b></div>").join("")+"</div>";
   h+='<div class="acts">'+(e.date<=today()?'<a class="btn'+(rs.length?"":" primary")+'" href="../ergebnisse/#neu/wk/'+encodeURIComponent(e.id)+'" data-stop>Ergebnis eintragen</a>':"")
@@ -258,6 +278,27 @@ function fillChamp(sel){
   if(sel&&!list.includes(sel)) list.push(sel);
   $("iChampSel").innerHTML=list.map(c=>opt(c,c,sel||"Hessische Meisterschaft")).join("")+opt("__new","Andere …",sel);
 }
+/* Disziplinen: Standard zum Ankreuzen, weitere über die Auswahl */
+function renderDiscs(){
+  const std=new Set(LA.STANDARD_DISCIPLINES.flatMap(([,l])=>l));
+  const extra=[...discSel].filter(d=>!std.has(d));
+  const chip=d=>'<button type="button" data-d="'+esc(d)+'" aria-pressed="'+discSel.has(d)+'">'+esc(d)+"</button>";
+  $("iDiscs").innerHTML=LA.STANDARD_DISCIPLINES.map(([g,l])=>'<div class="dg">'+g+'</div><div class="chips">'+l.map(chip).join("")+"</div>").join("")
+    +(extra.length?'<div class="dg">Weitere</div><div class="chips">'+extra.map(chip).join("")+"</div>":"");
+  const rest=LA.DISCIPLINE_GROUPS.map(([g,l])=>[g,l.map(([n])=>n).filter(n=>!std.has(n)&&!discSel.has(n))]).filter(([,l])=>l.length);
+  $("iDiscMore").innerHTML='<option value="">– hinzufügen –</option>'+rest.map(([g,l])=>'<optgroup label="'+g+'">'+l.map(n=>opt(n,n,"")).join("")+"</optgroup>").join("")
+    +'<option value="__new">Andere Disziplin …</option>';
+  $("discNewBox").hidden=true;
+}
+$("iDiscs").addEventListener("click",e=>{ const b=e.target.closest("button[data-d]"); if(!b) return; const d=b.dataset.d;
+  if(discSel.has(d)) discSel.delete(d); else discSel.add(d); b.setAttribute("aria-pressed",String(discSel.has(d)));
+  if(!LA.STANDARD_DISCIPLINES.some(([,l])=>l.includes(d))) renderDiscs(); });
+$("iDiscMore").addEventListener("change",()=>{ const v=$("iDiscMore").value;
+  if(v==="__new"){ $("discNewBox").hidden=false; $("iDiscNew").focus(); return; }
+  if(v){ discSel.add(v); renderDiscs(); } });
+function addNewDisc(){ const n=LA.normalizeDiscipline($("iDiscNew").value.trim()); if(!n) return; discSel.add(n); $("iDiscNew").value=""; renderDiscs(); }
+$("discNewAdd").addEventListener("click",addNewDisc);
+$("iDiscNew").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); addNewDisc(); } });
 function disarmDel(){ const b=$("del"); b.dataset.armed=""; b.textContent="Löschen"; b.classList.remove("armed"); clearTimeout(delTimer); }
 function openForm(id){
   reload();
@@ -273,6 +314,7 @@ function openForm(id){
   $("iPlace").value=e?e.place:""; $("iIntl").checked=!!(e&&e.intl);
   $("iDeadline").value=e&&e.deadline?e.deadline:""; $("iEntered").checked=!!(e&&e.entered);
   $("iUrl").value=e?e.url:""; $("iNote").value=e?e.note:"";
+  discSel=new Set(e?e.disciplines:[]); $("iDiscNew").value=""; renderDiscs();
   const sel=e?e.athleteIds:(ATH.length===1?[ATH[0].id]:[]);
   $("athBox").hidden=!ATH.length;
   $("iAths").innerHTML=ATH.map(a=>'<label class="chk"><input type="checkbox" value="'+esc(a.id)+'"'+(sel.includes(a.id)?" checked":"")+"> "+esc(a.name)+"</label>").join("");
@@ -307,7 +349,7 @@ $("form").addEventListener("submit",ev=>{
   if(url&&!/^https?:\/\/\S+\.\S+/i.test(url)) return err("Link muss mit https:// beginnen.");
   const now=new Date().toISOString();
   const rec={kind,champ,name,date,endDate:end&&end>date?end:null,place:$("iPlace").value.trim(),venue,intl:$("iIntl").checked,
-    deadline:dl||null,entered:$("iEntered").checked,athleteIds:[...$("iAths").querySelectorAll("input:checked")].map(x=>x.value),
+    deadline:dl||null,entered:$("iEntered").checked,disciplines:[...discSel],athleteIds:[...$("iAths").querySelectorAll("input:checked")].map(x=>x.value),
     url,note:$("iNote").value.trim(),updatedAt:now};
   if(editId) Object.assign(EV.find(x=>x.id===editId),rec);
   else EV.push(Object.assign({id:LA.newId("e"),createdAt:now},rec));

@@ -15,7 +15,8 @@ Offline-Web-App mit mehreren Leichtathletik-Modulen.
   Bestleistungen (PB/SB, ohne Rückenwind über +2,0 m/s); CSV-Export für Excel.
 - **Wettkampfkalender** (`kalender/`) – Wettkämpfe mit Wettkampfart (Sportfest, Meisterschaft, Sonstiges), Datum,
   Ort, Halle/Freiluft und Meldeschluss; „Ergebnis eintragen“ übernimmt die Angaben ins Ergebnisformular und verknüpft
-  das Ergebnis (`eventId`). Apple-Kalender: als Abo (Edge-Function `la-calendar`) oder als `.ics`-Datei.
+  das Ergebnis (`eventId`); gemeldete Disziplinen werden angekreuzt und bei der Ergebniseingabe zur Auswahl angeboten
+  (plus „Weitere Disziplin …“). Apple-Kalender: als Abo (Edge-Function `la-calendar`) oder als `.ics`-Datei.
 
 ## Auf iPhone/iPad installieren
 

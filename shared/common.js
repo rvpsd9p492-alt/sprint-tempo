@@ -100,7 +100,7 @@
 
   /* ---------- Wettkampfkalender ---------- */
   // { id, kind: "meet"|"champ"|"other", champ, name, date, endDate|null, place, venue: "indoor"|"outdoor",
-  //   deadline|null (Meldeschluss), entered (gemeldet), intl, athleteIds: [], url, note, createdAt, updatedAt }
+  //   deadline|null (Meldeschluss), entered (gemeldet), disciplines: [Name], intl, athleteIds: [], url, note, createdAt, updatedAt }
   // In der Cloud als kind "settings" mit id "event:<id>" gespeichert: ältere App-Versionen ignorieren diese Zeilen.
   const EVENT_KINDS = { meet: "Sportfest", champ: "Meisterschaft", other: "Sonstiger Wettkampf" };
   function cleanEvent(e) {
@@ -110,7 +110,10 @@
     const endDate = isIsoDate(e.endDate) && e.endDate > e.date ? e.endDate : null;
     return { id: e.id, kind, champ: kind === "champ" ? str(e.champ, 60) : "", name: str(e.name, 100), date: e.date, endDate,
       place: str(e.place, 80), venue: e.venue === "indoor" ? "indoor" : "outdoor", deadline: isIsoDate(e.deadline) ? e.deadline : null,
-      intl: !!e.intl, entered: !!e.entered, athleteIds: Array.isArray(e.athleteIds) ? e.athleteIds.filter((x) => typeof x === "string") : [],
+      intl: !!e.intl, entered: !!e.entered,
+      disciplines: [...new Set((Array.isArray(e.disciplines) ? e.disciplines : []).map((d) => normalizeDiscipline(String(d || "")).slice(0, 40)).filter(Boolean))]
+        .sort((a, b) => discOrder(a) - discOrder(b) || a.localeCompare(b, "de")).slice(0, 30),
+      athleteIds: Array.isArray(e.athleteIds) ? e.athleteIds.filter((x) => typeof x === "string") : [],
       url: /^https?:\/\//i.test(str(e.url, 300)) ? str(e.url, 300) : "", note: str(e.note, 500),
       createdAt: e.createdAt || e.updatedAt || new Date().toISOString(), updatedAt: e.updatedAt || new Date().toISOString() };
   }
@@ -148,6 +151,7 @@
     list.forEach((e) => {
       const title = eventTitle(e), desc = [eventType(e), e.venue === "indoor" ? "Halle" : "Freiluft"];
       if (e.deadline) desc.push("Meldeschluss " + fmtDate(e.deadline));
+      if (e.disciplines.length) desc.push(e.disciplines.join(", "));
       if (e.note) desc.push(e.note);
       L.push("BEGIN:VEVENT", "UID:" + e.id + "@leichtathletik-app", "DTSTAMP:" + stamp,
         "DTSTART;VALUE=DATE:" + icsDate(e.date), "DTEND;VALUE=DATE:" + icsDate(nextDay(e.endDate || e.date)),
@@ -179,6 +183,11 @@
     ["Wurf", [["Kugelstoß", "d", 0], ["Diskuswurf", "d", 0], ["Hammerwurf", "d", 0], ["Speerwurf", "d", 0], ["Ballwurf", "d", 0]]],
     ["Mehrkampf", [["Dreikampf", "p", 0], ["Vierkampf", "p", 0], ["Fünfkampf", "p", 0], ["Siebenkampf", "p", 0], ["Zehnkampf", "p", 0]]],
   ];
+  /** Gängige Disziplinen zum Ankreuzen im Wettkampfkalender (Rest über „Weitere Disziplin“). */
+  const STANDARD_DISCIPLINES = [
+    ["Sprint", ["60 m", "100 m", "200 m", "400 m"]], ["Hürden", ["60 m Hürden", "100 m Hürden", "110 m Hürden", "400 m Hürden"]],
+    ["Lauf", ["800 m", "1500 m", "3000 m", "5000 m"]], ["Staffel", ["4×100 m", "4×400 m"]],
+    ["Sprung", ["Hochsprung", "Stabhochsprung", "Weitsprung", "Dreisprung"]], ["Wurf", ["Kugelstoß", "Diskuswurf", "Hammerwurf", "Speerwurf"]]];
   const DISC = new Map();
   DISCIPLINE_GROUPS.forEach(([, list]) => list.forEach(([n, k, w]) => DISC.set(n, { kind: k, wind: !!w, order: DISC.size })));
   const discOrder = (name) => (DISC.has(name) ? DISC.get(name).order : 1000);
@@ -583,9 +592,9 @@
     athletes, saveAthletes, upsertAthlete, deleteAthlete, athleteName,
     results, saveResults, isWindy, isLegal,
     EVENT_KINDS, cleanEvent, events, saveEvents, eventTitle, eventType, daysUntil, eventsToICS,
-    DISCIPLINE_GROUPS, DISC, discOrder, normalizeDiscipline, normalizeStoredDisciplines, better, markUnit, bestMarks, ageClass, resultClass, isIsoDate, exactAge,
+    DISCIPLINE_GROUPS, STANDARD_DISCIPLINES, DISC, discOrder, normalizeDiscipline, normalizeStoredDisciplines, better, markUnit, bestMarks, ageClass, resultClass, isIsoDate, exactAge,
     CHAMPIONSHIPS, INTL_CHAMPS, canonChamp, champRank, isIntlChamp, championships, titles, readTextFile, parseCSV, toCSV, headerIndex, parseDate, importPreview, columnCountWarnings,
     autoPBs, effectivePBs, setManual, resetToRecorded,
     backupStatus, exportBackup, parseBackup, applyBackup, shareOrDownload,
-    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.18" };
+    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.19" };
 })();

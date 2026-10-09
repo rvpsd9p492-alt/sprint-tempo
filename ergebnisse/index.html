@@ -44,6 +44,12 @@
 .windrow .sign{flex:0 0 52px;font:700 20px "Barlow",sans-serif}
 .err{color:var(--warn);font-size:14px;font-weight:600;margin:6px 0 0}
 .hint{font-size:13px;color:var(--muted);margin:4px 0 0}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{border:1px solid var(--line);background:transparent;color:var(--ink);font:600 15px "Barlow",sans-serif;padding:8px 12px;border-radius:18px;cursor:pointer;min-height:40px}
+.chips button[aria-pressed="true"]{background:var(--track);border-color:var(--track);color:var(--track-ink)}
+.chips button .dn{font-weight:700;color:var(--ok);margin-left:4px}
+.chips button[aria-pressed="true"] .dn{color:inherit}
+.chips button.more{border-style:dashed}
 .formbtns{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
 .formbtns .primary{flex:1 1 auto}
 .chk{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:15px;cursor:pointer}
@@ -176,8 +182,15 @@
       </div>
     </div>
 
-    <label class="fl" for="iDisc">Disziplin</label>
-    <select id="iDisc" required></select>
+    <div id="evDiscBox" hidden>
+      <span class="fl">Für welche gemeldete Disziplin?</span>
+      <div class="chips" id="evDiscs" role="group" aria-label="Gemeldete Disziplinen"></div>
+      <p class="hint">✓ = schon ein Ergebnis eingetragen.</p>
+    </div>
+    <div id="discSelBox">
+      <label class="fl" for="iDisc">Disziplin</label>
+      <select id="iDisc" required></select>
+    </div>
     <div id="customBox" hidden>
       <label class="fl" for="iDiscName">Name der Disziplin</label>
       <input type="text" id="iDiscName" maxlength="40" placeholder="z. B. 3×800 m, Schlagball 80 g">
@@ -236,6 +249,7 @@
   <p class="err" id="formErr" role="alert"></p>
   <div class="formbtns">
     <button type="submit" class="btn primary" id="fSave">Speichern</button>
+    <button type="submit" class="btn" id="fSaveNext" hidden>Speichern + weitere Disziplin</button>
     <button type="button" class="btn" id="fCancel">Abbrechen</button>
     <button type="button" class="btn danger" id="fDel" hidden>Löschen</button>
   </div>
@@ -719,13 +733,38 @@ function applyEvent(id){
   if(e.athleteIds.length===1&&ATH.some(a=>a.id===e.athleteIds[0])) $("iAth").value=e.athleteIds[0];
   syncForm(); updAk();
 }
-$("iEvent").addEventListener("change",()=>{ if($("iEvent").value) applyEvent($("iEvent").value); });
+$("iEvent").addEventListener("change",()=>{ if($("iEvent").value) applyEvent($("iEvent").value); evDisc=null; renderEvDiscs(); });
+
+/* Gemeldete Disziplinen des Wettkampfs zur Auswahl; „Weitere Disziplin“ öffnet die normale Liste */
+let evDisc=null; // gewählte gemeldete Disziplin, "__other" für weitere, null = noch keine Wahl
+const curEvent=()=>{ const id=$("iEvent").value; return id?LA.events().find(e=>e.id===id)||null:null; };
+function chooseDisc(name){
+  if(DISC.has(name)||R.some(r=>r.discipline===name)){ buildDiscSelect(name); $("iDisc").value=name; }
+  else { buildDiscSelect(CUSTOM); $("iDisc").value=CUSTOM; $("iDiscName").value=name; } // eigene Disziplin: Wertung wählen
+}
+function renderEvDiscs(){
+  const e=curEvent(), list=e?e.disciplines:[];
+  $("evDiscBox").hidden=!list.length; $("fSaveNext").hidden=!list.length;
+  if(!list.length){ $("discSelBox").hidden=false; evDisc=null; syncForm(); return; }
+  const ath=$("iAth").value||null;
+  const done=d=>R.some(r=>r.eventId===e.id&&r.discipline===d&&(r.athleteId||null)===ath&&r.id!==editId);
+  $("evDiscs").innerHTML=list.map(d=>'<button type="button" data-d="'+esc(d)+'" aria-pressed="'+(evDisc===d)+'">'+esc(d)+(done(d)?'<span class="dn">✓</span>':"")+"</button>").join("")
+    +'<button type="button" class="more" data-d="__other" aria-pressed="'+(evDisc==="__other")+'">Weitere Disziplin …</button>';
+  $("discSelBox").hidden=evDisc!=="__other";
+  syncForm();
+}
+$("evDiscs").addEventListener("click",ev=>{ const b=ev.target.closest("button[data-d]"); if(!b) return;
+  evDisc=b.dataset.d;
+  if(evDisc==="__other"){ buildDiscSelect(""); renderEvDiscs(); $("iDisc").focus(); return; }
+  chooseDisc(evDisc); renderEvDiscs(); });
+$("iAth").addEventListener("change",renderEvDiscs);
 function openForm(id,evId){
   const r=id?R.find(x=>x.id===id):null;
   if(id&&!r){go("#",true);return;}
   editId=r?r.id:null;
   $("formHead").textContent=r?"Ergebnis bearbeiten":"Ergebnis erfassen";
   $("fDel").hidden=!r; disarmDel(); $("formErr").textContent="";
+  $("formSub").textContent="Pflichtfelder: Datum, Disziplin, Halle/Freiluft, Ergebnis.";
   const last=R.slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)))[0];
   const base=r||{date:today(),discipline:last?last.discipline:"",venue:last?last.venue:"outdoor",kind:last?last.kind:"t"};
   buildDiscSelect(base.discipline);
@@ -748,6 +787,14 @@ function openForm(id,evId){
   fillChampSelect(r?LA.canonChamp(r.champ):""); syncForm(); updAk();
   fillEventSelect(r?r.eventId:evId);
   if(!r&&evId) applyEvent(evId);
+  // gemeldete Disziplinen: beim Bearbeiten die vorhandene markieren, sonst die einzige noch offene vorschlagen
+  const e=curEvent(); evDisc=null;
+  if(e&&e.disciplines.length){
+    if(r) evDisc=e.disciplines.includes(r.discipline)?r.discipline:"__other";
+    else { const ath=$("iAth").value||null, open=e.disciplines.filter(d=>!R.some(x=>x.eventId===e.id&&x.discipline===d&&(x.athleteId||null)===ath));
+      if(open.length===1){ evDisc=open[0]; chooseDisc(evDisc); } else buildDiscSelect(""); }
+  }
+  renderEvDiscs();
 }
 function updAk(){
   const a=ATH.find(x=>x.id===$("iAth").value), d=$("iDate").value, intl=$("iIntl").checked;
@@ -771,6 +818,7 @@ $("form").addEventListener("submit",e=>{
   if(ATH.length&&!athleteId) return err("Athlet wählen.");
   const date=$("iDate").value;
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) return err("Datum fehlt.");
+  if(!$("evDiscBox").hidden&&!evDisc) return err("Disziplin wählen – gemeldete oder „Weitere Disziplin …“.");
   const d=currentDisc();
   if(!d.name) return err(d.custom?"Name der Disziplin fehlt.":"Disziplin wählen.");
   if(d.custom&&DISC.has(d.name)) { /* gibt es schon – normal behandeln */ Object.assign(d,DISC.get(d.name),{name:d.name}); }
@@ -790,6 +838,10 @@ $("form").addEventListener("submit",e=>{
   if(editId){ Object.assign(R.find(x=>x.id===editId),rec); }
   else R.push(Object.assign({id:"r"+Date.now().toString(36)+Math.random().toString(36).slice(2,7),createdAt:now},rec));
   persist();
+  if(e.submitter&&e.submitter.id==="fSaveNext"){ // gleicher Wettkampf, nächste Disziplin
+    const evId=rec.eventId, msg="Gespeichert: "+rec.discipline+" "+rec.mark+(m.value!=null?" "+LA.markUnit(rec):"");
+    openForm(null,evId); $("formSub").innerHTML='<span class="ok">✓ '+esc(msg)+"</span> – nächste Disziplin wählen."; window.scrollTo(0,0); return;
+  }
   closeForm();
 });
 $("fDel").addEventListener("click",()=>{

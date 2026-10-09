@@ -6,7 +6,7 @@
 
 type Ev = {
   id: string; kind?: string; champ?: string; name?: string; date: string; endDate?: string | null;
-  place?: string; venue?: string; deadline?: string | null; url?: string; note?: string;
+  place?: string; venue?: string; deadline?: string | null; url?: string; note?: string; disciplines?: string[];
 };
 
 const KINDS: Record<string, string> = { meet: "Sportfest", champ: "Meisterschaft", other: "Sonstiger Wettkampf" };
@@ -43,6 +43,7 @@ function ics(list: Ev[]): string {
     const t = title(e), end = isDate(e.endDate) && e.endDate > e.date ? e.endDate : e.date;
     const desc = [e.kind === "champ" && e.champ ? e.champ : KINDS[e.kind ?? "meet"] ?? "Wettkampf", e.venue === "indoor" ? "Halle" : "Freiluft"];
     if (isDate(e.deadline)) desc.push("Meldeschluss " + fmt(e.deadline));
+    if (Array.isArray(e.disciplines) && e.disciplines.length) desc.push(e.disciplines.join(", "));
     if (e.note) desc.push(e.note);
     L.push("BEGIN:VEVENT", "UID:" + e.id + "@leichtathletik-app", "DTSTAMP:" + stamp,
       "DTSTART;VALUE=DATE:" + d8(e.date), "DTEND;VALUE=DATE:" + d8(nextDay(end)),
