@@ -17,7 +17,7 @@
 <script src="../shared/theme.js"></script>
 <link rel="stylesheet" href="../shared/base.css">
 <style>
-.ath{display:block;width:100%;text-align:left;background:var(--surface);border:0;border-radius:14px;padding:14px 16px;margin-bottom:8px;color:var(--ink);font:inherit;cursor:pointer}
+.ath{display:block;width:100%;box-sizing:border-box;text-align:left;background:var(--surface);border:0;border-radius:14px;padding:14px 16px;margin-bottom:8px;color:var(--ink);font:inherit;cursor:pointer}
 .ath .nm{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .ath .nm b{font:600 21px "Barlow Condensed",sans-serif}
 .ath .nm span{font-size:14px;color:var(--muted)}
@@ -34,6 +34,11 @@
 .ath .tl .md{flex:0 0 auto;width:22px;text-align:center}
 .ath .tl .tx{flex:1;min-width:0}
 .ath .tl .sm{color:var(--muted);font-size:13px}
+.ath .tl .pl{display:inline-block;min-width:22px;font:700 14px "Barlow Condensed",sans-serif;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:0 3px}
+.ath .tview{display:flex;gap:4px;margin:6px 0 2px}
+.ath .tview button{flex:1 1 0;border:1px solid var(--line);background:transparent;color:var(--ink);font:600 13px "Barlow",sans-serif;padding:6px 8px;border-radius:7px;cursor:pointer;min-height:34px}
+.ath .tview button[aria-pressed="true"]{background:var(--track);border-color:var(--track);color:var(--track-ink)}
+.ath .nm .edit{font-size:14px;padding:0;margin-left:8px}
 .ath .ty{display:flex;justify-content:space-between;font:600 14px "Barlow Condensed",sans-serif;color:var(--muted);margin-top:8px;padding-bottom:2px;border-bottom:1px solid var(--line);letter-spacing:.3px}
 .ath .ty span:last-child{font:500 13px "Barlow",sans-serif}
 .ath .akh{font:600 15px "Barlow Condensed",sans-serif;color:var(--muted);margin-top:10px;letter-spacing:.3px;display:flex;gap:6px;align-items:center}
@@ -117,19 +122,32 @@ function syncSex(){
 }
 
 const MEDAL={1:"🥇",2:"🥈",3:"🥉"};
+// Ansicht der Titelübersicht: "year" (nach Jahr) oder "champ" (nach Meisterschaft) – je Gerät gespeichert
+let TVIEW=(()=>{ try{ return localStorage.getItem("laTitleView")==="champ"?"champ":"year"; }catch(e){ return "year"; } })();
 function titleHtml(a,res){
   const t=LA.titles(a.id,res); if(!t.length) return "";
   const count=l=>[1,2,3].filter(k=>l.some(r=>r.place===k)).map(k=>MEDAL[k]+" "+l.filter(r=>r.place===k).length).join("  ");
-  // nach Jahr gruppiert (neuestes zuerst), innerhalb des Jahres chronologisch nach Datum
-  const years=[...new Set(t.map(r=>r.date.slice(0,4)))].sort().reverse();
-  return '<div class="tit"><h3>Titel &amp; Medaillen<span>'+count(t)+"</span></h3>"+years.map(y=>{
-    const l=t.filter(r=>r.date.slice(0,4)===y).sort((x,z)=>x.date.localeCompare(z.date)||x.place-z.place);
-    return '<div class="ty"><span>'+y+"</span><span>"+count(l)+"</span></div>"+l.map(r=>{
-      const c=LA.ageClass(a,r.date,!!r.intl);
-      return '<div class="tl"><span class="md" aria-label="Platz '+r.place+'">'+MEDAL[r.place]+'</span><span class="tx">'+esc(r.champ.trim())+" · "+esc(r.discipline)
-        +'<br><span class="sm">'+LA.fmtDate(r.date).slice(0,6)+(r.meet?" · "+esc(r.meet):"")+(c?" · "+esc(c.label):"")+" · "+(r.venue==="indoor"?"Halle":"Freiluft")+" · "+esc(r.mark)+" "+LA.markUnit(r)+"</span></span></div>";
-    }).join("");
-  }).join("")+"</div>";
+  const mark=r=>r.place<=3?'<span class="md" aria-label="Platz '+r.place+'">'+MEDAL[r.place]+"</span>":'<span class="md"><span class="pl" aria-label="Platz '+r.place+'">'+r.place+".</span></span>";
+  const line=(r,head,dateTxt)=>{ const c=LA.ageClass(a,r.date,!!r.intl);
+    return '<div class="tl">'+mark(r)+'<span class="tx">'+head
+      +'<br><span class="sm">'+dateTxt+(r.meet?" · "+esc(r.meet):"")+(c?" · "+esc(c.label):"")+" · "+(r.venue==="indoor"?"Halle":"Freiluft")+" · "+esc(r.mark)+" "+LA.markUnit(r)+"</span></span></div>"; };
+  let body;
+  if(TVIEW==="champ"){
+    // nach Meisterschaft: höchstwertige zuerst (WM … Kreis), eigene danach; innerhalb neueste zuerst
+    // eigene internationale Meisterschaften direkt hinter der EM, andere eigene am Ende
+    const rank=nm=>{ const k=LA.champRank(nm); if(k>=0) return k*10; return t.some(r=>r.champ.trim()===nm&&LA.isIntlChamp(r))?LA.champRank("Europameisterschaft")*10-1:-1; };
+    const names=[...new Set(t.map(r=>r.champ.trim()))].sort((x,y)=>rank(y)-rank(x)||x.localeCompare(y,"de"));
+    body=names.map(nm=>{ const l=t.filter(r=>r.champ.trim()===nm).sort((x,z)=>z.date.localeCompare(x.date)||x.place-z.place);
+      return '<div class="ty"><span>'+esc(nm)+"</span><span>"+count(l)+"</span></div>"+l.map(r=>line(r,esc(r.discipline),LA.fmtDate(r.date))).join(""); }).join("");
+  } else {
+    // nach Jahr: neuestes zuerst, innerhalb des Jahres chronologisch
+    const years=[...new Set(t.map(r=>r.date.slice(0,4)))].sort().reverse();
+    body=years.map(y=>{ const l=t.filter(r=>r.date.slice(0,4)===y).sort((x,z)=>x.date.localeCompare(z.date)||x.place-z.place);
+      return '<div class="ty"><span>'+y+"</span><span>"+count(l)+"</span></div>"+l.map(r=>line(r,esc(r.champ.trim())+" · "+esc(r.discipline),LA.fmtDate(r.date).slice(0,6))).join(""); }).join("");
+  }
+  return '<div class="tit"><h3>Titel &amp; Medaillen<span>'+count(t)+"</span></h3>"
+    +'<div class="tview" role="group" aria-label="Ansicht"><button type="button" data-tv="year" aria-pressed="'+(TVIEW==="year")+'">Nach Jahr</button>'
+    +'<button type="button" data-tv="champ" aria-pressed="'+(TVIEW==="champ")+'">Nach Meisterschaft</button></div>'+body+"</div>";
 }
 function renderList(){
   const list=LA.athletes(), res=LA.results(), today=new Date().toISOString().slice(0,10);
@@ -152,10 +170,11 @@ function renderList(){
       +'</td><td class="dt">'+LA.fmtDate(r.date)+"</td></tr>").join("")+"</table>";
     const pbTxt=ordered.length?ordered.map(g=>(g.c?'<div class="akh">'+esc(g.c.label)+(cur&&cur.label===g.c.label?'<span class="cur">aktuell</span>':"")+"</div>":(groups.size>1?'<div class="akh">Ohne Jahrgang</div>':""))+table(g.list)).join("")
       :(n?'<div class="none">Keine gültigen Bestleistungen</div>':'<div class="none">Noch keine Wettkampfergebnisse</div>');
-    return '<button class="ath" data-id="'+esc(a.id)+'"><div class="nm"><b>'+esc(a.name)+"</b><span>"
-      +(a.birthYear?"Jg. "+a.birthYear+" · ":"")+(cur?esc(cur.label)+" · ":"")+LA.plural(n,"Ergebnis","Ergebnisse")+"</span></div>"
+    return '<div class="ath" data-id="'+esc(a.id)+'"><div class="nm"><b>'+esc(a.name)+"</b><span>"
+      +(a.birthYear?"Jg. "+a.birthYear+" · ":"")+(cur?esc(cur.label)+" · ":"")+LA.plural(n,"Ergebnis","Ergebnisse")
+      +'<button type="button" class="link edit" data-edit="'+esc(a.id)+'">Bearbeiten</button></span></div>'
       +(a.sex?"":'<div class="miss">Geschlecht fehlt – tippen zum Ergänzen (für M-/W-Altersklassen)</div>')
-      +pbTxt+titleHtml(a,res)+"</button>";
+      +pbTxt+titleHtml(a,res)+"</div>";
   }).join("");
 }
 /* ---------- CSV ---------- */
@@ -203,7 +222,11 @@ $("csvFile").addEventListener("change",async e=>{
     onImport:()=>{ changes.forEach(a=>LA.upsertAthlete(a));
       $("csvMsg").innerHTML='<span class="ok">Importiert: '+add+" neu, "+upd+" ergänzt.</span>"; renderList(); }});
 });
-$("list").addEventListener("click",e=>{const b=e.target.closest(".ath"); if(b) location.hash="#bearbeiten/"+encodeURIComponent(b.dataset.id);});
+$("list").addEventListener("click",e=>{
+  const tv=e.target.closest("[data-tv]");
+  if(tv){ TVIEW=tv.dataset.tv; try{ localStorage.setItem("laTitleView",TVIEW); }catch(err){} renderList(); return; }
+  const b=e.target.closest(".ath"); if(b) location.hash="#bearbeiten/"+encodeURIComponent(b.dataset.id);
+});
 
 function disarm(){const b=$("del"); b.dataset.armed=""; b.textContent="Löschen"; b.classList.remove("armed"); clearTimeout(delTimer);}
 function openForm(id){

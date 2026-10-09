@@ -195,9 +195,12 @@
       .filter((c) => c && !CHAMPIONSHIPS.includes(c)))].sort((a, b) => a.localeCompare(b, "de"));
     return CHAMPIONSHIPS.concat(extra);
   }
-  /** Titel & Medaillen: Meisterschaftsergebnisse mit Platz 1–3, wichtigste Meisterschaft und neueste zuerst. */
+  /** Internationale Meisterschaft: EM/WM oder Meisterschaft mit Schalter „international“. */
+  const isIntlChamp = (r) => { const c = String(r.champ || "").trim(); return !!c && (INTL_CHAMPS.includes(c) || !!r.intl); };
+  /** Titel & Medaillen: Meisterschaftsergebnisse mit Platz 1–3, bei internationalen Meisterschaften jede Platzierung. */
   function titles(athleteId, resList) {
-    return (resList || results()).filter((r) => r.athleteId === athleteId && String(r.champ || "").trim() && r.place >= 1 && r.place <= 3)
+    return (resList || results()).filter((r) => r.athleteId === athleteId && String(r.champ || "").trim() && r.place >= 1
+        && (r.place <= 3 || isIntlChamp(r)))
       .sort((a, b) => champRank(b.champ) - champRank(a.champ) || b.date.localeCompare(a.date) || a.place - b.place);
   }
 
@@ -503,8 +506,8 @@
     athletes, saveAthletes, upsertAthlete, deleteAthlete, athleteName,
     results, saveResults, isWindy, isLegal,
     DISCIPLINE_GROUPS, DISC, discOrder, normalizeDiscipline, normalizeStoredDisciplines, better, markUnit, bestMarks, ageClass, resultClass, isIsoDate, exactAge,
-    CHAMPIONSHIPS, INTL_CHAMPS, champRank, championships, titles, readTextFile, parseCSV, toCSV, headerIndex, parseDate, importPreview, columnCountWarnings,
+    CHAMPIONSHIPS, INTL_CHAMPS, champRank, isIntlChamp, championships, titles, readTextFile, parseCSV, toCSV, headerIndex, parseDate, importPreview, columnCountWarnings,
     autoPBs, effectivePBs, setManual, resetToRecorded,
     backupStatus, exportBackup, parseBackup, applyBackup, shareOrDownload,
-    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.13" };
+    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.14" };
 })();
