@@ -3,7 +3,7 @@
   "use strict";
 
   /* ---------- Bereiche, Ausrüstung, Steuerung ---------- */
-  const REGIONS = { beine: "Beine", huefte: "Hüfte & Gesäß", sprung: "Sprungkraft", rumpf: "Rumpf", ober: "Oberkörper", ganz: "Ganzkörper" };
+  const REGIONS = { beine: "Beine", huefte: "Hüfte & Gesäß", sprung: "Sprungkraft", rumpf: "Rumpf", bauch: "Bauch", ober: "Oberkörper", ganz: "Ganzkörper" };
   const EQUIP = { ohne: "ohne Gerät", kh: "Kurzhanteln", lh: "Langhantel", kb: "Kettlebell", band: "Miniband / Theraband", box: "Box / Bank",
     stange: "Klimmzugstange", ball: "Medizinball", partner: "Partner" };
   const GOALS = { ka: "Kraftausdauer", hyp: "Muskelaufbau", max: "Maximalkraft", sk: "Schnellkraft" };
@@ -13,7 +13,7 @@
 
   /* ---------- Übungen ----------
      kind: load = mit Zusatzlast, bw = Körpergewicht, iso = Halten (Sekunden), plyo = Sprünge, power = explosiv mit Gerät
-     side: je Seite; cap: [von, bis] Obergrenze der Wdh./Sekunden (z. B. Nordic Curls); poses: [Start, Ende] als Gelenkwinkel (siehe Skizze unten) */
+     side: je Seite; cap: [mindestens, höchstens] Wdh./Sekunden (z. B. Nordic Curls); poses: [Start, Ende] als Gelenkwinkel (siehe Skizze unten) */
   const EX = [
     { id: "kniebeuge", name: "Kniebeuge", region: "beine", equip: ["lh"], level: 2, kind: "load",
       muscles: "Oberschenkel vorn, Gesäß, Rumpf",
@@ -149,7 +149,7 @@
       easier: "Knie gebeugt", harder: "Oberes Bein abspreizen",
       poses: [{ t: -92, l1: [90, 90], l2: [91, 91], r1: [0, 90], r2: [60, 150] }, { t: -74, l1: [105, 105], l2: [106, 106], r1: [0, 90], r2: [60, 150] }],
       ax: "e1", x: 24, view: "Frontansicht" },
-    { id: "deadbug", name: "Dead Bug", region: "rumpf", equip: ["ohne"], level: 1, kind: "bw", side: true,
+    { id: "deadbug", name: "Dead Bug", region: "bauch", equip: ["ohne"], level: 1, kind: "bw", side: true,
       muscles: "Tiefe Bauchmuskulatur, Hüftbeuger",
       why: "Lehrt, Arme und Beine gegengleich bei stabilem Rumpf zu bewegen – wie beim Laufen.",
       steps: ["Rückenlage, Arme senkrecht nach oben, Hüfte und Knie im rechten Winkel.", "Einen Arm nach hinten und das gegenüberliegende Bein nach vorn strecken.", "Zurück zur Mitte, Seite wechseln."],
@@ -173,7 +173,7 @@
       easier: "Näher an den Befestigungspunkt", harder: "Halbkniend oder im Ausfallschritt",
       poses: [{ t: 0, l1: [8, -6], l2: [-8, 4], r1: [20, 125], r2: [22, 125] }, { t: 0, l1: [8, -6], l2: [-8, 4], r1: [86, 90], r2: [88, 92] }],
       props: [{ t: "bandTo", at: "h1", x: 4, y: 52 }], ax: "a2", x: 58 },
-    { id: "kneeraise", name: "Hängendes Knieheben", region: "rumpf", equip: ["stange"], level: 2, kind: "bw", cap: [6, 12],
+    { id: "kneeraise", name: "Hängendes Knieheben", region: "bauch", equip: ["stange"], level: 2, kind: "bw", cap: [6, 12],
       muscles: "Hüftbeuger, untere Bauchmuskulatur, Griffkraft",
       why: "Kräftigt den Kniehub – wichtig für eine hohe Schrittfrequenz.",
       steps: ["An der Stange hängen, Arme gestreckt.", "Knie kontrolliert bis mindestens Hüfthöhe ziehen.", "Langsam absenken, ohne Schwung."],
@@ -181,6 +181,87 @@
       easier: "Im Stütz an der Dipstation", harder: "Gestreckte Beine",
       poses: [{ t: 0, l1: [0, 0], l2: [3, 3], r1: [180, 180], r2: [180, 180], anchor: ["h1", 14] }, { t: -8, l1: [104, 10], l2: [106, 12], r1: [180, 180], r2: [180, 180], anchor: ["h1", 14] }],
       props: [{ t: "bar", y: 14 }], ax: "h1", x: 60 },
+    /* ---------- Bauch ---------- */
+    { id: "crunch", name: "Crunch", region: "bauch", equip: ["ohne"], level: 1, kind: "bw",
+      muscles: "Gerader Bauchmuskel (oberer Anteil)",
+      why: "Einstiegsübung für die gerade Bauchmuskulatur bei geringer Belastung des Rückens.",
+      steps: ["Rückenlage, Beine aufgestellt, Fingerspitzen an den Schläfen.", "Kopf und Schultern langsam vom Boden einrollen, bis die Schulterblätter abheben.", "Kurz halten, kontrolliert zurückrollen."],
+      cues: ["Nicht am Kopf ziehen", "Unterer Rücken bleibt am Boden", "Ausatmen beim Einrollen"],
+      easier: "Arme vor der Brust gekreuzt", harder: "Arme über dem Kopf, 2 s oben halten",
+      poses: [{ t: -90, l1: [138, 28], l2: [140, 30], r1: [-160, -110], r2: [-158, -108] }, { t: -62, l1: [138, 28], l2: [140, 30], r1: [-132, -82], r2: [-130, -80] }],
+      ax: "p", x: 62 },
+    { id: "situp", name: "Sit-up", region: "bauch", equip: ["ohne"], level: 1, kind: "bw",
+      muscles: "Gerader Bauchmuskel, Hüftbeuger",
+      why: "Kräftigt Bauch und Hüftbeuger über die volle Bewegung – der Klassiker im Athletiktraining.",
+      steps: ["Rückenlage, Beine aufgestellt, Füße ggf. unter einer Sprossenwand fixiert.", "Arme nach vorn strecken und den Oberkörper Wirbel für Wirbel bis zum Sitzen aufrollen.", "Langsam wieder abrollen, bis die Schultern den Boden berühren."],
+      cues: ["Einrollen statt mit geradem Rücken hochreißen", "Kein Schwung aus den Armen", "Langsam abrollen (2–3 s)"],
+      easier: "Nur bis zur Hälfte (Halber Sit-up)", harder: "Arme über dem Kopf oder Hantelscheibe vor der Brust",
+      poses: [{ t: -90, l1: [138, 28], l2: [140, 30], r1: [125, 125], r2: [127, 127] }, { t: -8, l1: [138, 28], l2: [140, 30], r1: [92, 92], r2: [94, 94] }],
+      ax: "p", x: 58 },
+    { id: "situpdreh", name: "Sit-up mit Drehung", region: "bauch", equip: ["ohne"], level: 2, kind: "bw", side: true,
+      muscles: "Schräge und gerade Bauchmuskulatur",
+      why: "Kräftigt die schrägen Bauchmuskeln, die im Sprint die Gegenrotation von Schultern und Becken steuern.",
+      steps: ["Rückenlage, Beine aufgestellt, Hände an den Schläfen.", "Oberkörper aufrollen und dabei den Ellbogen zum gegenüberliegenden Knie drehen.", "Langsam abrollen, nächste Wiederholung zur anderen Seite."],
+      cues: ["Drehung aus dem Oberkörper, nicht nur mit dem Ellbogen", "Becken bleibt ruhig am Boden", "Ausatmen beim Aufrollen"],
+      easier: "Nur halb aufrollen (schräger Crunch)", harder: "Mit Medizinball, Ball neben die Hüfte führen",
+      poses: [{ t: -90, l1: [138, 28], l2: [140, 30], r1: [-160, -110], r2: [-158, -108] }, { t: -24, l1: [138, 28], l2: [140, 30], r1: [60, 150], r2: [150, 110] }],
+      ax: "p", x: 58, view: "Drehung zur Seite" },
+    { id: "mbsitup", name: "Medizinball-Sit-up mit Wurf", region: "bauch", equip: ["ball", "partner"], level: 2, kind: "power",
+      muscles: "Gerader Bauchmuskel, Hüftbeuger, Schultern",
+      why: "Explosive Rumpfbeugung – Schnellkraft für Bauch und Hüftbeuger.",
+      steps: ["Rückenlage, Beine aufgestellt, Ball mit gestreckten Armen über dem Kopf am Boden.", "Explosiv aufrichten und den Ball im Hochkommen zum Partner oder an die Wand werfen.", "Ball fangen, kontrolliert abrollen und neu ansetzen."],
+      cues: ["Bewegung aus dem Bauch, Arme verlängern nur", "Kontrolliert abrollen", "Leichter Ball (1–3 kg)"],
+      easier: "Ohne Wurf, Ball nur vor die Brust führen", harder: "Schwererer Ball, schnellere Folge",
+      poses: [{ t: -90, l1: [138, 28], l2: [140, 30], r1: [-90, -90], r2: [-92, -92] }, { t: -14, l1: [138, 28], l2: [140, 30], r1: [140, 140], r2: [142, 142] }],
+      props: [{ t: "ball", at: "h1" }], ax: "p", x: 62 },
+    { id: "revcrunch", name: "Reverse Crunch", region: "bauch", equip: ["ohne"], level: 1, kind: "bw",
+      muscles: "Gerader Bauchmuskel (unterer Anteil)",
+      why: "Kräftigt den unteren Bauch und die Beckenkontrolle – Grundlage für einen stabilen Kniehub.",
+      steps: ["Rückenlage, Arme neben dem Körper, Hüfte und Knie im rechten Winkel.", "Becken einrollen und die Knie Richtung Brust ziehen, bis das Gesäß abhebt.", "Langsam Wirbel für Wirbel ablegen."],
+      cues: ["Kein Schwung aus den Beinen", "Bewegung kommt aus dem Becken", "Langsam ablegen"],
+      easier: "Kleinere Bewegung, Füße zwischendurch absetzen", harder: "Auf der Schrägbank, Kopf oben",
+      poses: [{ t: -90, l1: [180, 90], l2: [178, 92], r1: [90, 90], r2: [92, 92] }, { t: -112, l1: [-168, 130], l2: [-166, 132], r1: [100, 100], r2: [102, 102] }],
+      ax: "s", x: 36 },
+    { id: "fahrrad", name: "Fahrrad-Crunch", region: "bauch", equip: ["ohne"], level: 2, kind: "bw", side: true,
+      muscles: "Schräge und gerade Bauchmuskulatur, Hüftbeuger",
+      why: "Gegengleiche Bewegung von Oberkörper und Beinen – ähnlich dem Laufrhythmus.",
+      steps: ["Rückenlage, Hände an den Schläfen, Schultern leicht angehoben, Beine in der Luft.", "Ein Knie zur Brust ziehen, das andere Bein strecken, gleichzeitig zum angezogenen Knie drehen.", "Seiten im ruhigen Rhythmus wechseln."],
+      cues: ["Unterer Rücken bleibt am Boden", "Langsam statt hektisch", "Gestrecktes Bein bleibt über dem Boden"],
+      easier: "Gestrecktes Bein höher halten", harder: "Langsamer, 1 s Pause bei jeder Drehung",
+      poses: [{ t: -64, l1: [158, 70], l2: [104, 104], r1: [-132, -82], r2: [-130, -80] }, { t: -64, l1: [104, 104], l2: [158, 70], r1: [-132, -82], r2: [-130, -80] }],
+      ax: "p", x: 58 },
+    { id: "klappmesser", name: "Klappmesser (V-up)", region: "bauch", equip: ["ohne"], level: 3, kind: "bw", cap: [6, 15],
+      muscles: "Gerader Bauchmuskel, Hüftbeuger",
+      why: "Anspruchsvolle Übung für Bauch und Hüftbeuger mit voller Spannung über den ganzen Körper.",
+      steps: ["Rückenlage, Arme über dem Kopf, Beine gestreckt.", "Gleichzeitig Oberkörper und gestreckte Beine anheben, Hände Richtung Füße.", "Kontrolliert ablegen, ohne ganz zu entspannen."],
+      cues: ["Beine bleiben gestreckt", "Kein Schwung – kontrolliert ablegen", "Bei Rückenschmerzen abbrechen"],
+      easier: "Knie gebeugt (Tuck-up) oder nur ein Bein", harder: "Oben 1 s halten, mit leichtem Ball",
+      poses: [{ t: -90, l1: [92, 92], l2: [93, 93], r1: [-92, -92], r2: [-93, -93] }, { t: -42, l1: [138, 138], l2: [139, 139], r1: [132, 132], r2: [134, 134] }],
+      ax: "p", x: 60 },
+    { id: "russian", name: "Russian Twist", region: "bauch", equip: ["ohne", "ball"], level: 2, kind: "bw", side: true,
+      muscles: "Schräge Bauchmuskulatur, Hüftbeuger",
+      why: "Rotationskraft und -kontrolle des Rumpfs.",
+      steps: ["Sitzen, Oberkörper leicht zurückgelehnt, Füße angehoben.", "Hände oder Ball vor der Brust halten.", "Oberkörper abwechselnd nach rechts und links drehen, Hände neben der Hüfte."],
+      cues: ["Rücken gerade, nicht rund", "Drehung aus dem Oberkörper", "Füße ruhig halten"],
+      easier: "Füße am Boden", harder: "Mit Medizinball oder Hantelscheibe",
+      poses: [{ t: -38, l1: [122, 54], l2: [124, 56], r1: [110, 70], r2: [112, 72] }, { t: -38, l1: [122, 54], l2: [124, 56], r1: [40, 20], r2: [60, 30] }],
+      props: [{ t: "ball", at: "h1" }], ax: "p", x: 56, view: "Drehung zur Seite" },
+    { id: "beinheben", name: "Beinheben liegend", region: "bauch", equip: ["ohne"], level: 2, kind: "bw", cap: [8, 15],
+      muscles: "Unterer gerader Bauchmuskel, Hüftbeuger",
+      why: "Kräftigt Hüftbeuger und unteren Bauch für einen kräftigen Kniehub.",
+      steps: ["Rückenlage, Hände neben dem Gesäß, Beine gestreckt knapp über dem Boden.", "Gestreckte Beine bis zur Senkrechten anheben.", "Langsam absenken, ohne die Füße abzulegen."],
+      cues: ["Unterer Rücken bleibt am Boden", "Langsam absenken", "Knie bei Bedarf leicht beugen"],
+      easier: "Knie gebeugt", harder: "Beine am Ende nach oben drücken (Becken abheben)",
+      poses: [{ t: -90, l1: [96, 96], l2: [97, 97], r1: [90, 90], r2: [92, 92] }, { t: -90, l1: [176, 176], l2: [177, 177], r1: [90, 90], r2: [92, 92] }],
+      ax: "p", x: 50 },
+    { id: "hollow", name: "Hollow Hold", region: "bauch", equip: ["ohne"], level: 2, kind: "iso", cap: [15, 40],
+      muscles: "Gesamte vordere Rumpfmuskulatur",
+      why: "Ganzkörperspannung aus dem Turnen – überträgt die Kraft beim Abdruck ohne Hohlkreuz.",
+      steps: ["Rückenlage, Arme über dem Kopf, Beine gestreckt.", "Schultern und Beine leicht anheben, unteren Rücken in den Boden drücken.", "Bananenform halten."],
+      cues: ["Unterer Rücken bleibt am Boden", "Je tiefer Arme und Beine, desto schwerer", "Ruhig weiteratmen"],
+      easier: "Knie gebeugt, Arme neben dem Körper", harder: "Leicht vor- und zurückschaukeln (Hollow Rock)",
+      poses: [{ t: -74, l1: [106, 106], l2: [107, 107], r1: [-112, -112], r2: [-113, -113] }],
+      ax: "p", x: 58 },
     { id: "superman", name: "Rückenstrecker (Superman)", region: "rumpf", equip: ["ohne"], level: 1, kind: "bw",
       muscles: "Rückenstrecker, Gesäß, hintere Schulter",
       why: "Gegenpart zur Bauchmuskulatur – für einen stabilen, belastbaren Rücken.",
@@ -353,7 +434,8 @@
     if (c.phase === "reg") { sets = 2; if (ex.kind === "load") hint = "locker, ca. 60 %"; notes.push("Übergang: locker, Fokus auf Technik"); }
     if (age != null && age >= 50) { rest += 30; if (ex.kind === "plyo") { lo = hi = Math.max(3, Math.round(lo * 0.75)); } notes.push("Masters 50+: längere Pausen" + (ex.kind === "plyo" ? ", weniger Sprünge" : "")); }
     if (age != null && age >= 60 && ex.kind === "plyo") sets = Math.max(2, sets - 1);
-    if (ex.cap) { lo = Math.min(lo, ex.cap[0]); hi = Math.max(lo, Math.min(hi, ex.cap[1])); }
+    // Obergrenze: Spanne proportional nach unten verschieben (z. B. 10–15 → 4–6 bei Nordic Curls)
+    if (ex.cap && hi > ex.cap[1]) { lo = Math.max(ex.cap[0], Math.round(ex.cap[1] * lo / hi)); hi = ex.cap[1]; }
     if (ex.kind === "iso") { lo = Math.round(lo / 5) * 5; hi = Math.round(hi / 5) * 5; }
     return { sets, reps: lo === hi ? String(lo) : lo + "–" + hi, unit: UNIT[ex.kind], side: !!ex.side, rest, hint, notes };
   }

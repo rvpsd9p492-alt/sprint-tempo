@@ -13,7 +13,7 @@ Offline-Web-App mit mehreren Leichtathletik-Modulen.
 - **Wettkampfergebnisse** (`ergebnisse/`) – Ergebnisse mit Datum, Disziplin, Halle/Freiluft, Ergebnis, Wind,
   Meisterschaft, Platzierung und Kommentar erfassen; Filter nach Jahr, Disziplin, Meisterschaft und Halle/Freiluft;
   Bestleistungen (PB/SB, ohne Rückenwind über +2,0 m/s); CSV-Export für Excel.
-- **Kräftigung** (`kraft/`) – 29 Übungen für den ganzen Körper als Kacheln mit Strichfiguren-Skizze (animierbar),
+- **Kräftigung** (`kraft/`) – 39 Übungen (davon 12 für den Bauch) für den ganzen Körper als Kacheln mit Strichfiguren-Skizze (animierbar),
   Ausführung, Hinweisen, leichter/schwerer und Belastungsempfehlung aus Ziel, Niveau, Trainingsphase und Alter
   (`shared/kraft.js`). Je Athlet: Programm mit ☆-Favoriten, eigene Serien/Wdh./Gewichte, Trainingsmodus mit
   Pausen-Timer und Verlauf. In der Cloud als `kind = 'settings'`, `id = 'kraft:<Athlet>'`.
