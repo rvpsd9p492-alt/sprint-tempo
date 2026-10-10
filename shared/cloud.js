@@ -12,7 +12,8 @@
   const PAGE = 1000;
   // Wettkampfkalender: als kind "settings" mit id "event:<id>" – so ignorieren ältere App-Versionen diese Zeilen
   const EV = "event:";
-  const KR = "kraft:"; // Kräftigung je Athlet, ebenfalls als kind "settings"
+  // Übungsprogramme je Athlet (Kräftigung, Dehnen), ebenfalls als kind "settings" mit id "<programm>:<athlet>"
+  const PROGS = Object.keys(LA.PROGRAMS);
   // Datenbank-Limit des Supabase-Tarifs (Free: 500 MB) – über LA_CLOUD.dbLimitMB anpassbar
   const DB_LIMIT = (Number(CFG.dbLimitMB) > 0 ? Number(CFG.dbLimitMB) : 500) * 1024 * 1024;
 
@@ -38,7 +39,7 @@
     LA.athletes().forEach((a) => { if (pushed["athlete:" + a.id] !== ms(a.updatedAt)) n++; });
     LA.results().forEach((r) => { if (pushed["result:" + r.id] !== ms(r.updatedAt)) n++; });
     LA.events().forEach((e) => { if (pushed["settings:" + EV + e.id] !== ms(e.updatedAt)) n++; });
-    const kr = LA.kraftAll(); Object.keys(kr).forEach((id) => { if (pushed["settings:" + KR + id] !== ms(kr[id].updatedAt)) n++; });
+    PROGS.forEach((pg) => { const all = LA.progAll(pg); Object.keys(all).forEach((id) => { if (pushed["settings:" + pg + ":" + id] !== ms(all[id].updatedAt)) n++; }); });
     n += (LA.load(K.deleted, []) || []).length;
     if (s.settingsHash !== settingsHash(LA.tempoSettings())) n++;
     return n;
@@ -205,17 +206,19 @@
     const pushed = s.pushed || (s.pushed = {});
     let ath = LA.athletes(), res = LA.results(), changedA = false, changedR = false, changedS = false, changedE = false;
     const evs = LA.load(K.events, []) || [];
-    const kr = LA.kraftAll(); let changedK = false;
+    const prog = {}, changedP = {};
+    PROGS.forEach((pg) => { prog[pg] = LA.progAll(pg); });
     const tomb = LA.load(K.deleted, []) || [];
     rows.forEach((row) => {
       const t = ms(row.updated_at), key = row.kind + ":" + row.id;
-      if (row.kind === "settings" && row.id.startsWith(KR)) {
-        const id = row.id.slice(KR.length), local = kr[id];
+      const pg = row.kind === "settings" ? PROGS.find((x) => row.id.startsWith(x + ":")) : null;
+      if (pg) {
+        const kr = prog[pg], id = row.id.slice(pg.length + 1), local = kr[id];
         if (local && ms(local.updatedAt) > t) return;
         const lt = tomb.find((x) => x.kind === row.kind && x.id === row.id);
         if (lt && ms(lt.at) > t) return;
-        if (row.deleted) { if (local) { delete kr[id]; changedK = true; } }
-        else if (row.data) { kr[id] = Object.assign({}, row.data, { updatedAt: new Date(t).toISOString() }); changedK = true; }
+        if (row.deleted) { if (local) { delete kr[id]; changedP[pg] = true; } }
+        else if (row.data) { kr[id] = Object.assign({}, row.data, { updatedAt: new Date(t).toISOString() }); changedP[pg] = true; }
         pushed[key] = t;
         return;
       }
@@ -260,8 +263,8 @@
     if (changedA) localStorage.setItem(K.athletes, JSON.stringify(ath));
     if (changedR) localStorage.setItem(K.results, JSON.stringify(res));
     if (changedE) localStorage.setItem(K.events, JSON.stringify(evs));
-    if (changedK) localStorage.setItem(K.kraft, JSON.stringify(kr));
-    return changedA || changedR || changedS || changedE || changedK;
+    PROGS.forEach((pg) => { if (changedP[pg]) localStorage.setItem(LA.PROGRAMS[pg], JSON.stringify(prog[pg])); });
+    return changedA || changedR || changedS || changedE || Object.keys(changedP).length > 0;
   }
 
   async function pull(sess, s) {
@@ -295,8 +298,8 @@
       if (pushed["result:" + r.id] !== ms(r.updatedAt)) add("result", r.id, r, r.updatedAt);
     });
     LA.events().forEach((e) => { if (pushed["settings:" + EV + e.id] !== ms(e.updatedAt)) add("settings", EV + e.id, e, e.updatedAt); });
-    const kr = LA.kraftAll();
-    Object.keys(kr).forEach((id) => { if (pushed["settings:" + KR + id] !== ms(kr[id].updatedAt)) add("settings", KR + id, kr[id], kr[id].updatedAt); });
+    PROGS.forEach((pg) => { const all = LA.progAll(pg);
+      Object.keys(all).forEach((id) => { if (pushed["settings:" + pg + ":" + id] !== ms(all[id].updatedAt)) add("settings", pg + ":" + id, all[id], all[id].updatedAt); }); });
     const tomb = LA.load(K.deleted, []) || [];
     tomb.forEach((x) => add(x.kind, x.id, null, x.at, true));
     const set = LA.tempoSettings(), h = settingsHash(set);

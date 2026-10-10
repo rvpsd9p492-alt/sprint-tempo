@@ -1,7 +1,7 @@
 // Offline-Cache: alles wird beim ersten Besuch geladen; danach kommt die App aus dem Cache
 // und aktualisiert sich im Hintergrund, sobald Netz da ist (beim nächsten Start aktiv).
 // Bei jeder Änderung an den Dateien CACHE hochzählen, damit Geräte die neue Version vollständig laden.
-const CACHE = "leichtathletik-v25";
+const CACHE = "leichtathletik-v26";
 const ASSETS = [
   "./",
   "athleten/",
@@ -9,12 +9,17 @@ const ASSETS = [
   "ergebnisse/",
   "kalender/",
   "kraft/",
+  "dehnen/",
   "shared/base.css",
   "shared/theme.js",
   "shared/config.js",
   "shared/common.js",
   "shared/cloud.js",
+  "shared/figur.js",
+  "shared/uebungen.js",
+  "shared/uebungen.css",
   "shared/kraft.js",
+  "shared/dehnen.js",
   "manifest.webmanifest",
   "icons/apple-touch-icon.png",
   "icons/icon-192.png",
