@@ -119,6 +119,17 @@ h3:first-of-type{margin-top:4px}
       </span>
       <span class="go" aria-hidden="true">›</span>
     </a>
+    <a class="tile" href="kraft/">
+      <span class="ic alt" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 16h14M5 11v10M9 8v16M23 8v16M27 11v10"/></svg>
+      </span>
+      <span class="tx">
+        <h2>Kräftigung</h2>
+        <span class="d">Übungen mit Skizze, Programm je Athlet</span>
+        <span class="st" id="stKraft"></span>
+      </span>
+      <span class="go" aria-hidden="true">›</span>
+    </a>
   </nav>
 
   <div class="hubcols">
@@ -201,6 +212,8 @@ function render(){
     $("stRes").textContent=res.length+" Ergebnis"+(res.length===1?"":"se")+" · zuletzt "+LA.fmtDate(last);
   } else $("stRes").textContent="";
   const t=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  const kr=LA.kraftAll(), kb=LA.athletes().map(a=>[a,kr[a.id]?LA.kraftFor(a.id):null]).filter(x=>x[1]&&(x[1].favs.length||x[1].log.length));
+  $("stKraft").textContent=kb.map(([a,k])=>a.name+": "+LA.plural(k.favs.length,"Übung","Übungen")+(k.log.length?" · zuletzt "+LA.fmtDate(k.log[k.log.length-1].date).slice(0,6):"")).join(" · ");
   const up=LA.events().filter(e=>(e.endDate||e.date)>=t), nx=up[0];
   const dl=up.filter(e=>e.deadline&&!e.entered&&e.deadline>=t).sort((a,b)=>a.deadline.localeCompare(b.deadline))[0];
   $("stCal").textContent=nx?"Nächster: "+LA.fmtDate(nx.date).slice(0,6)+" "+LA.eventTitle(nx)

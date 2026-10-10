@@ -1,9 +1,9 @@
 /* Gemeinsame Funktionen aller Leichtathletik-Module: Athleten, Ergebnisse, Bestzeiten, Sicherung, Offline. */
 (function () {
   "use strict";
-  const KEYS = { athletes: "laAthletes.v1", tempo: "sprintTempo.v1", results: "laResults.v1", events: "laEvents.v1", meta: "laMeta.v1",
+  const KEYS = { athletes: "laAthletes.v1", tempo: "sprintTempo.v1", results: "laResults.v1", events: "laEvents.v1", kraft: "laKraft.v1", meta: "laMeta.v1",
     deleted: "laDeleted.v1", cloud: "laCloud.v1" };
-  const SYNCED = [KEYS.athletes, KEYS.results, KEYS.tempo, KEYS.events];
+  const SYNCED = [KEYS.athletes, KEYS.results, KEYS.tempo, KEYS.events, KEYS.kraft];
   const TEMPO_SETTINGS = ["rt", "hochPen", "handStd", "handFly", "kExt", "tol"];
   /** Sprintstrecken, deren Bestzeiten Sprint-Tempo nutzt (Schlüssel = Strecke in m). */
   const SPRINT = { "60": "60 m", "100": "100 m", "200": "200 m", "400": "400 m" };
@@ -84,6 +84,8 @@
   function deleteAthlete(id) {
     saveAthletes(athletes().filter((a) => a.id !== id));
     trackDelete("athlete", id);
+    const kr = kraftAll();
+    if (kr[id]) { delete kr[id]; save(KEYS.kraft, kr); trackDelete("settings", "kraft:" + id); }
     const res = results();
     let changed = false;
     res.forEach((r) => { if (r.athleteId === id) { r.athleteId = null; r.updatedAt = new Date().toISOString(); changed = true; } });
@@ -169,6 +171,31 @@
     });
     L.push("END:VCALENDAR");
     return L.map(icsFold).join("\r\n") + "\r\n";
+  }
+
+  /* ---------- Kräftigung je Athlet ----------
+     { [athleteId]: { goal, level, phase, favs: [Übungs-id], over: { id: { sets, reps, load, note } }, log: [{ date, items: [{ id, sets }] }], updatedAt } }
+     In der Cloud als kind "settings" mit id "kraft:<athleteId>" (ältere App-Versionen ignorieren das). */
+  function cleanKraft(k) {
+    if (!k || typeof k !== "object") return null;
+    const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n), over = {};
+    Object.keys(k.over || {}).forEach((id) => { const o = k.over[id] || {};
+      const sets = Number.isInteger(o.sets) && o.sets > 0 && o.sets <= 12 ? o.sets : null;
+      const rec = { sets, reps: str(o.reps, 12), load: str(o.load, 20), note: str(o.note, 120) };
+      if (rec.sets || rec.reps || rec.load || rec.note) over[id] = rec; });
+    const log = (Array.isArray(k.log) ? k.log : []).filter((x) => x && isIsoDate(x.date) && Array.isArray(x.items))
+      .map((x) => ({ date: x.date, at: x.at || null, items: x.items.filter((i) => i && typeof i.id === "string").map((i) => ({ id: i.id, sets: Math.max(0, Math.min(12, i.sets | 0)) })) }))
+      .slice(-300);
+    return { goal: ["ka", "hyp", "max", "sk"].includes(k.goal) ? k.goal : "hyp", level: ["ein", "fort", "leist"].includes(k.level) ? k.level : "fort",
+      phase: ["allg", "spez", "wk", "reg"].includes(k.phase) ? k.phase : "allg",
+      favs: [...new Set((Array.isArray(k.favs) ? k.favs : []).filter((x) => typeof x === "string"))].slice(0, 60), over, log,
+      updatedAt: k.updatedAt || new Date().toISOString() };
+  }
+  function kraftAll() { const k = load(KEYS.kraft, {}); return k && typeof k === "object" && !Array.isArray(k) ? k : {}; }
+  function kraftFor(athleteId) { return cleanKraft(kraftAll()[athleteId] || { updatedAt: "1970-01-01T00:00:00.000Z" }); }
+  function saveKraft(athleteId, rec) {
+    const all = kraftAll(); all[athleteId] = cleanKraft(Object.assign({}, rec, { updatedAt: new Date().toISOString() }));
+    return save(KEYS.kraft, all);
   }
 
   /* ---------- Disziplinen & Bestleistungen ---------- */
@@ -474,7 +501,8 @@
     return set;
   }
   function fingerprint() {
-    const ev = load(KEYS.events, []);
+    const ev = load(KEYS.events, []), kr = load(KEYS.kraft, null);
+    if (kr && Object.keys(kr).length) return hash(JSON.stringify({ a: load(KEYS.athletes, []), s: tempoSettings(), r: load(KEYS.results, []), e: ev, k: kr }));
     return hash(JSON.stringify(Array.isArray(ev) && ev.length ? { a: load(KEYS.athletes, []), s: tempoSettings(), r: load(KEYS.results, []), e: ev }
       : { a: load(KEYS.athletes, []), s: tempoSettings(), r: load(KEYS.results, []) }));
   }
@@ -510,7 +538,7 @@
 
   async function exportBackup() {
     const data = { app: "leichtathletik", v: 2, exported: new Date().toISOString(),
-      athletes: athletes(), tempoSettings: tempoSettings(), results: results(), events: events() };
+      athletes: athletes(), tempoSettings: tempoSettings(), results: results(), events: events(), kraft: kraftAll() };
     const name = "leichtathletik-sicherung-" + new Date().toISOString().slice(0, 10) + ".json";
     const res = await shareOrDownload(name, "application/json", JSON.stringify(data, null, 2));
     if (res !== "aborted") markBackedUp();
@@ -520,13 +548,14 @@
   /* Liest eine Sicherungsdatei (v2, v1 oder alte Sprint-Tempo-Sicherung) in ein einheitliches Format. */
   function parseBackup(text) {
     const d = JSON.parse(text);
-    const out = { athletes: [], tempoSettings: {}, results: [], events: [] };
+    const out = { athletes: [], tempoSettings: {}, results: [], events: [], kraft: {} };
     const pickSettings = (src) => { TEMPO_SETTINGS.forEach((k) => { if (src && typeof src[k] === "number") out.tempoSettings[k] = src[k]; }); };
     if (d && d.app === "leichtathletik" && d.v >= 2) {
       out.athletes = (Array.isArray(d.athletes) ? d.athletes : []).map(cleanAthlete).filter(Boolean);
       pickSettings(d.tempoSettings);
       out.results = Array.isArray(d.results) ? d.results : [];
       out.events = (Array.isArray(d.events) ? d.events : []).map(cleanEvent).filter(Boolean);
+      if (d.kraft && typeof d.kraft === "object") Object.keys(d.kraft).forEach((id) => { const k = cleanKraft(d.kraft[id]); if (k) out.kraft[id] = k; });
     } else if (d && d.app === "leichtathletik") {
       const t = d.tempo || {};
       out.athletes = (Array.isArray(t.athletes) ? t.athletes : []).map(fromTempoAthlete).filter(Boolean);
@@ -560,6 +589,9 @@
     saveResults(mr.list);
     const me = mergeById(events(), b.events || []);
     if (me.added + me.updated) saveEvents(me.list);
+    const kr = kraftAll(); let nk = 0;
+    Object.keys(b.kraft || {}).forEach((id) => { if (!kr[id] || String(b.kraft[id].updatedAt) > String(kr[id].updatedAt || "")) { kr[id] = b.kraft[id]; nk++; } });
+    if (nk) save(KEYS.kraft, kr);
     markBackedUp();
     return { athletes: ma.added + ma.updated, results: mr.added + mr.updated, events: me.added + me.updated };
   }
@@ -591,10 +623,11 @@
   window.LA = { KEYS, SPRINT, SPRINT_DISTS, PB_MONTHS, load, save, newId, trackDelete, hash, tempoSettings, TEMPO_SETTINGS,
     athletes, saveAthletes, upsertAthlete, deleteAthlete, athleteName,
     results, saveResults, isWindy, isLegal,
+    cleanKraft, kraftAll, kraftFor, saveKraft,
     EVENT_KINDS, cleanEvent, events, saveEvents, eventTitle, eventType, daysUntil, eventsToICS,
     DISCIPLINE_GROUPS, STANDARD_DISCIPLINES, DISC, discOrder, normalizeDiscipline, normalizeStoredDisciplines, better, markUnit, bestMarks, ageClass, resultClass, isIsoDate, exactAge,
     CHAMPIONSHIPS, INTL_CHAMPS, canonChamp, champRank, isIntlChamp, championships, titles, readTextFile, parseCSV, toCSV, headerIndex, parseDate, importPreview, columnCountWarnings,
     autoPBs, effectivePBs, setManual, resetToRecorded,
     backupStatus, exportBackup, parseBackup, applyBackup, shareOrDownload,
-    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.19" };
+    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.20" };
 })();
