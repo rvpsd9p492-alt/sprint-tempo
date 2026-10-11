@@ -6,6 +6,7 @@ const P="la"+K.id[0].toUpperCase()+K.id.slice(1); // Gerätespeicher-Präfix, z.
 const opt=(v,t,sel)=>'<option value="'+esc(v)+'"'+(v===sel?" selected":"")+">"+esc(t)+"</option>";
 const ls={get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }};
 const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+let disc=(()=>{ const v=ls.get(P+".disc",""); return K.DISCIPLINES&&K.DISCIPLINES[v]?v:""; })();
 let ATH=LA.athletes(), aid=null, tab=ls.get(P+".tab","all"), region="", ordering=false;
 
 /* ---------- Athlet & Steuerung ---------- */
@@ -54,7 +55,8 @@ function tile(ex,r,i,n,last){
   const d=doseFor(ex,r), fav=r.favs.includes(ex.id);
   let h='<div class="tile" data-id="'+ex.id+'">'+K.sketch(ex)+'<div class="nm">'+esc(ex.name)+"</div>"
     +'<div class="rg">'+esc(K.REGIONS[ex.region])+(last[ex.id]?" · zuletzt "+LA.fmtDate(last[ex.id]).slice(0,6):"")+"</div>"
-    +'<div class="ds'+(d.changed?" ad":"")+'">'+esc(doseTxt(d))+(d.load?" <small>· "+esc(d.load)+"</small>":"")+"</div>";
+    +'<div class="ds'+(d.changed?" ad":"")+'">'+esc(doseTxt(d))+(d.load?" <small>· "+esc(d.load)+"</small>":"")+"</div>"
+    +(disc&&ex.disc[disc]===2?'<span class="key">Schlüsselübung '+disc+" m</span>":disc&&ex.disc[disc]===1?'<span class="key alt">sinnvoll für '+disc+" m</span>":"");
   if(aid) h+='<button type="button" class="star" data-fav="'+ex.id+'" aria-pressed="'+fav+'" aria-label="'+(fav?"Aus dem Programm entfernen":"Ins Programm aufnehmen")+'">'+(fav?"★":"☆")+"</button>";
   if(ordering&&n) h+='<div class="mv"><button type="button" data-mv="-1" data-i="'+i+'"'+(i===0?" disabled":"")+' aria-label="nach vorn">↑</button><button type="button" data-mv="1" data-i="'+i+'"'+(i===n-1?" disabled":"")+' aria-label="nach hinten">↓</button></div>';
   return h+"</div>";
@@ -75,12 +77,16 @@ function renderGrid(){
     const has=new Set(list.map(e=>e.region));
     $("cov").innerHTML=Object.keys(K.REGIONS).map(k=>'<span class="'+(has.has(k)?"on":"off")+'">'+(has.has(k)?"✓ ":"")+esc(K.REGIONS[k])+"</span>").join("");
     const miss=Object.keys(K.REGIONS).filter(k=>!has.has(k)&&!T.skipCoverage.includes(k));
-    $("covHint").textContent=!n?"In „Alle Übungen“ mit ☆ auswählen – "+T.empty+".":miss.length?"Für ein ausgewogenes Programm fehlt noch: "+miss.map(k=>K.REGIONS[k]).join(", ")+".":"Alle Bereiche abgedeckt.";
+    $("covHint").textContent=(!n?"In „Alle Übungen“ mit ☆ auswählen – "+T.empty+".":miss.length?"Für ein ausgewogenes Programm fehlt noch: "+miss.map(k=>K.REGIONS[k]).join(", ")+".":"Alle Bereiche abgedeckt.")
+      +(disc&&n?" Schlüsselübungen für "+disc+" m im Programm: "+list.filter(e=>e.disc[disc]===2).length+" von "+K.EX.filter(e=>e.disc[disc]===2).length+".":"");
     $("grid").innerHTML=n?list.map((ex,i)=>tile(ex,r,i,n,last)).join(""):'<p class="empty" style="grid-column:1/-1">Noch leer – wechsle zu „Alle Übungen“ und tippe auf ☆.</p>';
   } else {
     const eq=$("fEquip").value, q=$("fSearch").value.trim().toLowerCase();
-    list=K.EX.filter(e=>(!region||e.region===region)&&(!eq||e.equip.includes(eq))&&(!q||(e.name+" "+e.muscles).toLowerCase().includes(q)));
-    $("fCount").textContent=list.length+" von "+K.EX.length+" Übungen";
+    list=K.EX.filter(e=>(!region||e.region===region)&&(!eq||e.equip.includes(eq))&&(!q||(e.name+" "+e.muscles).toLowerCase().includes(q))&&(!disc||e.disc[disc]));
+    // Disziplin gewählt: Schlüsselübungen zuerst, sonst Reihenfolge der Bibliothek
+    if(disc) list=list.map((e,i)=>[e,i]).sort((a,b)=>(b[0].disc[disc]-a[0].disc[disc])||a[1]-b[1]).map(x=>x[0]);
+    $("fFocus").hidden=!disc; if(disc) $("fFocus").innerHTML="<b>"+esc(K.DISCIPLINES[disc].label)+":</b> "+esc(K.DISCIPLINES[disc].focus);
+    $("fCount").textContent=list.length+" von "+K.EX.length+" Übungen"+(disc?" · "+list.filter(e=>e.disc[disc]===2).length+" Schlüsselübungen":"");
     $("grid").innerHTML=list.length?list.map(ex=>tile(ex,r,0,0,last)).join(""):'<p class="empty" style="grid-column:1/-1">Keine Übung passt zum Filter.</p>';
   }
   $("startBtn").hidden=!(mine&&list.length);
@@ -96,11 +102,14 @@ function renderHist(r){
 }
 function renderFilters(){
   $("fRegion").innerHTML='<button type="button" data-r="" aria-pressed="'+(region==="")+'">Alle</button>'+Object.keys(K.REGIONS).map(k=>'<button type="button" data-r="'+k+'" aria-pressed="'+(region===k)+'">'+esc(K.REGIONS[k])+"</button>").join("");
+  $("fDisc").hidden=!K.DISCIPLINES;
+  if(K.DISCIPLINES&&!$("fDisc").options.length) $("fDisc").innerHTML='<option value="">Alle Disziplinen</option>'+Object.keys(K.DISCIPLINES).map(k=>opt(k,K.DISCIPLINES[k].label,disc)).join("");
   if(!$("fEquip").options.length) $("fEquip").innerHTML='<option value="">Alle Geräte</option>'+Object.keys(K.EQUIP).map(k=>opt(k,K.EQUIP[k],"")).join("");
 }
 function renderAll(){ renderWho(); renderFilters(); renderGrid(); }
 $("fRegion").addEventListener("click",e=>{ const b=e.target.closest("button[data-r]"); if(!b) return; region=b.dataset.r; renderFilters(); renderGrid(); });
 $("fEquip").addEventListener("change",renderGrid);
+$("fDisc").addEventListener("change",()=>{ disc=$("fDisc").value; ls.set(P+".disc",disc); renderGrid(); });
 $("fSearch").addEventListener("input",renderGrid);
 $("tabMine").addEventListener("click",()=>{ tab="mine"; ls.set(P+".tab",tab); renderGrid(); });
 $("tabAll").addEventListener("click",()=>{ tab="all"; ordering=false; ls.set(P+".tab",tab); renderGrid(); });
@@ -125,13 +134,17 @@ $("exPlay").addEventListener("click",()=>{
     $("exSketch").innerHTML=K.sketch(cur,e); anim=requestAnimationFrame(step); };
   anim=requestAnimationFrame(step);
 });
+// „Schlüsselübung 60/100 m“ · „sinnvoll für 200 m“
+function discBadges(ex){ const by=v=>Object.keys(K.DISCIPLINES).filter(k=>ex.disc[k]===v), k2=by(2), k1=by(1);
+  return (k2.length?'<span class="key" style="margin:0">Schlüsselübung '+k2.join("/")+" m</span>":"")+(k1.length?'<span class="key alt" style="margin:0">sinnvoll für '+k1.join("/")+" m</span>":""); }
 function openEx(id){
   cur=K.BY_ID.get(id); if(!cur){ go("#",true); return; }
   stopAnim();
   const r=rec(), d=doseFor(cur,r), base=K.dose(cur,r,age());
   $("exName").textContent=cur.name;
   $("exBadges").innerHTML='<span class="badge">'+esc(K.REGIONS[cur.region])+"</span>"+cur.equip.map(e=>'<span class="badge">'+esc(K.EQUIP[e])+"</span>").join("")
-    +'<span class="badge">'+["","leicht","mittel","anspruchsvoll"][cur.level]+"</span>"+(cur.view?'<span class="badge">Skizze: '+esc(cur.view)+"</span>":"");
+    +'<span class="badge">'+["","leicht","mittel","anspruchsvoll"][cur.level]+"</span>"+(cur.view?'<span class="badge">Skizze: '+esc(cur.view)+"</span>":"")
+    +(K.DISCIPLINES?discBadges(cur):"");
   $("exDose").innerHTML="<b>"+esc(d.sets+" × "+d.reps)+"</b><span>"+esc(d.unit+(d.side?" je Seite":""))+(d.changed?" · angepasst":"")+"</span>";
   $("exKv").innerHTML=(d.rest?"<dt>Pause</dt><dd>"+K.fmtRest(d.rest)+" "+T.restBetween+"</dd>":"")+"<dt>"+T.hintLabel+"</dt><dd>"+esc(d.hint)+"</dd>"
     +(d.load?"<dt>"+T.loadLabel+"</dt><dd>"+esc(d.load)+"</dd>":"")+(d.note?"<dt>Notiz</dt><dd>"+esc(d.note)+"</dd>":"")

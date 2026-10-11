@@ -187,6 +187,20 @@
       poses: [{ t: 0, l1: [3, 0], l2: [-3, 0], r1: [-30, -30], r2: [-28, -28] }, { t: 0, l1: [3, 0], l2: [-3, 0], r1: [180, 180], r2: [182, 182] }],
       ax: "a1", x: 56 },
   ];
+  /* Bedeutung je Sprintstrecke: 2 = Schlüsselübung, 1 = sinnvoll ergänzend */
+  const DISC_SCORES = {
+    hueftbeuger: { 60: 2, 100: 2, 200: 2 }, couch: { 60: 1, 100: 2, 200: 2 }, quad: { 60: 1, 100: 1, 200: 1 }, hamstring: { 60: 1, 100: 2, 200: 2 },
+    hamstringband: { 60: 1, 100: 2, 200: 2 }, wade: { 60: 1, 100: 2, 200: 2 }, soleus: { 60: 1, 100: 1, 200: 2 }, taube: { 100: 1, 200: 1 },
+    schmetterling: { 200: 1 }, seitausfall: { 100: 1, 200: 2 }, tractus: { 200: 2 }, flanke: { 200: 1 },
+    beinpendel: { 60: 2, 100: 2, 200: 2 }, beinpendelseit: { 60: 1, 100: 1, 200: 2 }, wgs: { 60: 2, 100: 2, 200: 2 }, raupe: { 60: 1, 100: 1, 200: 1 },
+    kniebrust: { 60: 1, 100: 2, 200: 1 }, sweep: { 60: 1, 100: 2, 200: 2 }, armkreisen: { 60: 1, 100: 1, 200: 1 },
+  };
+  EX.forEach((e) => { e.disc = DISC_SCORES[e.id] || {}; });
+  const DISCIPLINES = {
+    60: { label: "Sprint 60 m", focus: "Vor dem Start vor allem dynamisch: Hüftbeuger, Hüfte und Oberschenkelrückseite für eine tiefe, kraftvolle Startposition." },
+    100: { label: "Sprint 100 m", focus: "Große Schrittamplitude: Hüftbeuger, Oberschenkel hinten und Waden – dynamisch vorher, statisch danach." },
+    200: { label: "Sprint 200 m", focus: "Wie 100 m plus Kurve: seitliche Hüfte, Adduktoren und Waden/Achillessehne der Innenseite." },
+  };
   const BY_ID = new Map(EX.map((e) => [e.id, e]));
 
   /* ---------- Empfehlung ---------- */
@@ -211,7 +225,7 @@
   }
   const fmtRest = (s) => (s >= 60 ? (s % 60 ? Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0") + " min" : s / 60 + " min") : s + " s");
 
-  window.LA_DEHNEN = { id: "dehnen", REGIONS, EQUIP, GOALS, LEVELS, PHASES: null, DEFAULTS, EX, BY_ID, sketch: LA_FIGUR.sketch, dose, fmtRest, UNIT,
+  window.LA_DEHNEN = { id: "dehnen", DISCIPLINES, REGIONS, EQUIP, GOALS, LEVELS, PHASES: null, DEFAULTS, EX, BY_ID, sketch: LA_FIGUR.sketch, dose, fmtRest, UNIT,
     text: { title: "Dehnen", goal: "Anlass", level: "Niveau", phase: null, start: "Dehnprogramm starten",
       run: "Dehnprogramm", runHint: "„▶ halten“ startet die Haltezeit; bei dynamischen Übungen Durchgang antippen.", done: "Dehnprogramm abschließen",
       sub: "Statische und dynamische Dehnübungen mit Skizze, Erklärung und Empfehlung. Mit ☆ stellst du dir dein Programm zusammen.",

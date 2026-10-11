@@ -19,6 +19,7 @@ Offline-Web-App mit mehreren Leichtathletik-Modulen.
   Pausen-Timer und Verlauf. In der Cloud als `kind = 'settings'`, `id = 'kraft:<Athlet>'` bzw. `'dehnen:<Athlet>'`.
 - **Dehnen** (`dehnen/`) – 23 statische und dynamische Dehnübungen, Empfehlung nach Anlass (Aufwärmen, nach dem
   Training, Beweglichkeitseinheit), Niveau und Alter (`shared/dehnen.js`); Haltezeit-Timer im Dehnprogramm.
+  Filter „Disziplin“ (Sprint 60/100/200 m) hebt Schlüsselübungen hervor und erklärt den Schwerpunkt der Strecke.
   Kräftigung und Dehnen teilen Seite (`shared/uebungen.js`/`.css`) und Skizzen (`shared/figur.js`).
 - **Wettkampfkalender** (`kalender/`) – Wettkämpfe mit Wettkampfart (Sportfest, Meisterschaft, Sonstiges), Datum,
   Ort, Halle/Freiluft und Meldeschluss; „Ergebnis eintragen“ übernimmt die Angaben ins Ergebnisformular und verknüpft

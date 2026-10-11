@@ -327,6 +327,22 @@
       poses: [{ t: 48, l1: [62, -26], l2: [66, -22], r1: [8, 6], r2: [10, 8] }, { t: -14, l1: [-4, -2], l2: [-2, 0], r1: [204, 206], r2: [206, 208], f1: 40, f2: 40, anchor: ["t1", 92] }],
       props: [{ t: "ball", at: "h1" }] },
   ];
+  /* Bedeutung je Sprintstrecke: 2 = Schlüsselübung, 1 = sinnvoll ergänzend (fehlt = kein besonderer Bezug) */
+  const DISC_SCORES = {
+    kniebeuge: { 60: 2, 100: 2, 200: 1 }, bulgarisch: { 60: 2, 100: 2, 200: 2 }, ausfall: { 60: 1, 100: 1, 200: 1 }, stepup: { 60: 2, 100: 1, 200: 1 },
+    rdl: { 60: 1, 100: 2, 200: 2 }, nordic: { 60: 1, 100: 2, 200: 2 }, bruecke1: { 60: 1, 100: 1, 200: 1 }, hipthrust: { 60: 2, 100: 2, 200: 1 },
+    wade: { 60: 1, 100: 2, 200: 1 }, copenhagen: { 100: 1, 200: 2 }, monster: { 100: 1, 200: 2 },
+    strecksprung: { 60: 2, 100: 1 }, boxjump: { 60: 2, 100: 1 }, pogo: { 60: 1, 100: 2, 200: 2 }, splitjump: { 60: 1, 100: 2, 200: 1 },
+    plank: { 60: 1, 100: 1, 200: 1 }, seitstuetz: { 100: 1, 200: 2 }, deadbug: { 60: 1, 100: 1, 200: 1 }, pallof: { 100: 1, 200: 2 },
+    kneeraise: { 60: 1, 100: 2, 200: 1 }, liegestuetz: { 60: 1 }, kbswing: { 60: 2, 100: 1, 200: 1 }, mbwurf: { 60: 2, 100: 1 },
+    mbsitup: { 60: 1 }, revcrunch: { 100: 1 }, fahrrad: { 100: 1, 200: 1 }, russian: { 200: 1 }, beinheben: { 100: 1 }, hollow: { 60: 1, 100: 1, 200: 1 },
+  };
+  EX.forEach((e) => { e.disc = DISC_SCORES[e.id] || {}; });
+  const DISCIPLINES = {
+    60: { label: "Sprint 60 m", focus: "Start und Beschleunigung: explosive Hüft- und Kniestreckung, horizontale Kraft – Schnellkraft und Maximalkraft der Beine." },
+    100: { label: "Sprint 100 m", focus: "Beschleunigung und Höchstgeschwindigkeit: reaktive Kraft, starke Oberschenkelrückseite (Zerrungsschutz), schneller Kniehub." },
+    200: { label: "Sprint 200 m", focus: "Wie 100 m plus Kurve und Stehvermögen: seitliche Hüft- und Rumpfstabilität, Adduktoren, Kraftausdauer der Beine." },
+  };
   const BY_ID = new Map(EX.map((e) => [e.id, e]));
 
   /* ---------- Belastungsempfehlung ---------- */
@@ -357,7 +373,7 @@
   }
   const fmtRest = (s) => (s >= 60 ? (s % 60 ? Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0") + " min" : s / 60 + " min") : s + " s");
 
-  window.LA_KRAFT = { id: "kraft", REGIONS, EQUIP, GOALS, LEVELS, PHASES, DEFAULTS, EX, BY_ID, sketch: LA_FIGUR.sketch, dose, fmtRest, UNIT,
+  window.LA_KRAFT = { id: "kraft", DISCIPLINES, REGIONS, EQUIP, GOALS, LEVELS, PHASES, DEFAULTS, EX, BY_ID, sketch: LA_FIGUR.sketch, dose, fmtRest, UNIT,
     text: { title: "Kräftigung", goal: "Trainingsziel", level: "Leistungsniveau", phase: "Trainingsphase", start: "Training starten",
       run: "Training", runHint: "Serie antippen, wenn erledigt – die Pause startet automatisch.", done: "Training abschließen",
       sub: "Übungen für den ganzen Körper – mit Skizze, Erklärung und Empfehlung. Mit ☆ stellst du dir dein Programm zusammen.",
