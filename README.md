@@ -13,13 +13,13 @@ Offline-Web-App mit mehreren Leichtathletik-Modulen.
 - **Wettkampfergebnisse** (`ergebnisse/`) – Ergebnisse mit Datum, Disziplin, Halle/Freiluft, Ergebnis, Wind,
   Meisterschaft, Platzierung und Kommentar erfassen; Filter nach Jahr, Disziplin, Meisterschaft und Halle/Freiluft;
   Bestleistungen (PB/SB, ohne Rückenwind über +2,0 m/s); CSV-Export für Excel.
-- **Kräftigung** (`kraft/`) – 39 Übungen (davon 12 für den Bauch) für den ganzen Körper als Kacheln mit Strichfiguren-Skizze (animierbar),
+- **Kräftigung** (`kraft/`) – 42 Übungen (davon 12 für den Bauch) für den ganzen Körper als Kacheln mit Strichfiguren-Skizze (animierbar),
   Ausführung, Hinweisen, leichter/schwerer und Belastungsempfehlung aus Ziel, Niveau, Trainingsphase und Alter
   (`shared/kraft.js`). Je Athlet: Programm mit ☆-Favoriten, eigene Serien/Wdh./Gewichte, Trainingsmodus mit
   Pausen-Timer und Verlauf. In der Cloud als `kind = 'settings'`, `id = 'kraft:<Athlet>'` bzw. `'dehnen:<Athlet>'`.
-- **Dehnen** (`dehnen/`) – 23 statische und dynamische Dehnübungen, Empfehlung nach Anlass (Aufwärmen, nach dem
+- **Dehnen** (`dehnen/`) – 24 statische und dynamische Dehnübungen, Empfehlung nach Anlass (Aufwärmen, nach dem
   Training, Beweglichkeitseinheit), Niveau und Alter (`shared/dehnen.js`); Haltezeit-Timer im Dehnprogramm.
-  Filter „Disziplin“ (Sprint 60/100/200 m) hebt Schlüsselübungen hervor und erklärt den Schwerpunkt der Strecke.
+  Filter „Disziplin“ (Kurzsprint, Weitsprung, Kugelstoßen, Würfe) hebt Schlüsselübungen hervor und erklärt den Schwerpunkt der Strecke.
   Kräftigung und Dehnen teilen Seite (`shared/uebungen.js`/`.css`) und Skizzen (`shared/figur.js`).
 - **Wettkampfkalender** (`kalender/`) – Wettkämpfe mit Wettkampfart (Sportfest, Meisterschaft, Sonstiges), Datum,
   Ort, Halle/Freiluft und Meldeschluss; „Ergebnis eintragen“ übernimmt die Angaben ins Ergebnisformular und verknüpft

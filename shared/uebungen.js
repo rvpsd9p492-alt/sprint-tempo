@@ -56,7 +56,7 @@ function tile(ex,r,i,n,last){
   let h='<div class="tile" data-id="'+ex.id+'">'+K.sketch(ex)+'<div class="nm">'+esc(ex.name)+"</div>"
     +'<div class="rg">'+esc(K.REGIONS[ex.region])+(last[ex.id]?" · zuletzt "+LA.fmtDate(last[ex.id]).slice(0,6):"")+"</div>"
     +'<div class="ds'+(d.changed?" ad":"")+'">'+esc(doseTxt(d))+(d.load?" <small>· "+esc(d.load)+"</small>":"")+"</div>"
-    +(disc&&ex.disc[disc]===2?'<span class="key">Schlüsselübung '+disc+" m</span>":disc&&ex.disc[disc]===1?'<span class="key alt">sinnvoll für '+disc+" m</span>":"");
+    +(disc&&ex.disc[disc]===2?'<span class="key">Schlüsselübung '+esc(K.DISCIPLINES[disc].short)+"</span>":disc&&ex.disc[disc]===1?'<span class="key alt">sinnvoll für '+esc(K.DISCIPLINES[disc].short)+"</span>":"");
   if(aid) h+='<button type="button" class="star" data-fav="'+ex.id+'" aria-pressed="'+fav+'" aria-label="'+(fav?"Aus dem Programm entfernen":"Ins Programm aufnehmen")+'">'+(fav?"★":"☆")+"</button>";
   if(ordering&&n) h+='<div class="mv"><button type="button" data-mv="-1" data-i="'+i+'"'+(i===0?" disabled":"")+' aria-label="nach vorn">↑</button><button type="button" data-mv="1" data-i="'+i+'"'+(i===n-1?" disabled":"")+' aria-label="nach hinten">↓</button></div>';
   return h+"</div>";
@@ -78,7 +78,7 @@ function renderGrid(){
     $("cov").innerHTML=Object.keys(K.REGIONS).map(k=>'<span class="'+(has.has(k)?"on":"off")+'">'+(has.has(k)?"✓ ":"")+esc(K.REGIONS[k])+"</span>").join("");
     const miss=Object.keys(K.REGIONS).filter(k=>!has.has(k)&&!T.skipCoverage.includes(k));
     $("covHint").textContent=(!n?"In „Alle Übungen“ mit ☆ auswählen – "+T.empty+".":miss.length?"Für ein ausgewogenes Programm fehlt noch: "+miss.map(k=>K.REGIONS[k]).join(", ")+".":"Alle Bereiche abgedeckt.")
-      +(disc&&n?" Schlüsselübungen für "+disc+" m im Programm: "+list.filter(e=>e.disc[disc]===2).length+" von "+K.EX.filter(e=>e.disc[disc]===2).length+".":"");
+      +(disc&&n?" Schlüsselübungen für "+K.DISCIPLINES[disc].label+" im Programm: "+list.filter(e=>e.disc[disc]===2).length+" von "+K.EX.filter(e=>e.disc[disc]===2).length+".":"");
     $("grid").innerHTML=n?list.map((ex,i)=>tile(ex,r,i,n,last)).join(""):'<p class="empty" style="grid-column:1/-1">Noch leer – wechsle zu „Alle Übungen“ und tippe auf ☆.</p>';
   } else {
     const eq=$("fEquip").value, q=$("fSearch").value.trim().toLowerCase();
@@ -134,9 +134,10 @@ $("exPlay").addEventListener("click",()=>{
     $("exSketch").innerHTML=K.sketch(cur,e); anim=requestAnimationFrame(step); };
   anim=requestAnimationFrame(step);
 });
-// „Schlüsselübung 60/100 m“ · „sinnvoll für 200 m“
+// „Schlüsselübung Kurzsprint, Weitsprung“ · „sinnvoll für Kugel“
 function discBadges(ex){ const by=v=>Object.keys(K.DISCIPLINES).filter(k=>ex.disc[k]===v), k2=by(2), k1=by(1);
-  return (k2.length?'<span class="key" style="margin:0">Schlüsselübung '+k2.join("/")+" m</span>":"")+(k1.length?'<span class="key alt" style="margin:0">sinnvoll für '+k1.join("/")+" m</span>":""); }
+  const nm=l=>esc(l.map(k=>K.DISCIPLINES[k].short).join(", "));
+  return (k2.length?'<span class="key" style="margin:0">Schlüsselübung '+nm(k2)+"</span>":"")+(k1.length?'<span class="key alt" style="margin:0">sinnvoll für '+nm(k1)+"</span>":""); }
 function openEx(id){
   cur=K.BY_ID.get(id); if(!cur){ go("#",true); return; }
   stopAnim();

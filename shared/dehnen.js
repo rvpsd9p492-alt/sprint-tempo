@@ -130,6 +130,14 @@
       poses: [{ t: -20, l1: [9, 0], l2: [-9, 0], r1: [196, 200], r2: [-30, 40], front: true }], ax: "p", x: 60, view: "Frontansicht" },
 
     // ---------- dynamisch ----------
+    { id: "offenesbuch", name: "Offenes Buch", region: "ruecken", equip: ["ohne"], level: 1, kind: "dynamic", side: true,
+      muscles: "Brustwirbelsäule (Rotation), Brust, vordere Schulter",
+      why: "Mobilisiert die Drehung des Oberkörpers – wichtig für Würfe und Stöße, entlastet den unteren Rücken.",
+      steps: ["Seitlage, Knie und Hüfte im rechten Winkel, Arme gestreckt vor der Brust.", "Oberen Arm in einem Bogen zur anderen Seite öffnen, Blick folgt der Hand.", "Kurz halten, langsam zurück."],
+      cues: ["Knie bleiben aufeinander liegen", "Drehung aus dem Brustkorb, nicht aus dem Becken", "Ausatmen beim Öffnen"],
+      easier: "Kleinere Bewegung, Kissen unter dem Kopf", harder: "Am Ende 3 s halten, Hand Richtung Boden",
+      poses: [{ t: -90, l1: [138, 30], l2: [140, 32], r1: [120, 120], r2: [122, 122] }, { t: -90, l1: [138, 30], l2: [140, 32], r1: [-120, -120], r2: [122, 122] }],
+      ax: "p", x: 62, view: "Seitlage, Arm öffnet nach hinten" },
     { id: "beinpendel", name: "Beinpendel vor und zurück", region: "hinten", equip: ["wand"], level: 1, kind: "dynamic", side: true,
       muscles: "Hüftbeuger, Oberschenkel hinten, Gesäß",
       why: "Bereitet die Hüfte auf große Schrittamplituden vor – ideal im Aufwärmen.",
@@ -187,19 +195,22 @@
       poses: [{ t: 0, l1: [3, 0], l2: [-3, 0], r1: [-30, -30], r2: [-28, -28] }, { t: 0, l1: [3, 0], l2: [-3, 0], r1: [180, 180], r2: [182, 182] }],
       ax: "a1", x: 56 },
   ];
-  /* Bedeutung je Sprintstrecke: 2 = Schlüsselübung, 1 = sinnvoll ergänzend */
+  /* Bedeutung je Disziplingruppe: 2 = Schlüsselübung, 1 = sinnvoll ergänzend */
   const DISC_SCORES = {
-    hueftbeuger: { 60: 2, 100: 2, 200: 2 }, couch: { 60: 1, 100: 2, 200: 2 }, quad: { 60: 1, 100: 1, 200: 1 }, hamstring: { 60: 1, 100: 2, 200: 2 },
-    hamstringband: { 60: 1, 100: 2, 200: 2 }, wade: { 60: 1, 100: 2, 200: 2 }, soleus: { 60: 1, 100: 1, 200: 2 }, taube: { 100: 1, 200: 1 },
-    schmetterling: { 200: 1 }, seitausfall: { 100: 1, 200: 2 }, tractus: { 200: 2 }, flanke: { 200: 1 },
-    beinpendel: { 60: 2, 100: 2, 200: 2 }, beinpendelseit: { 60: 1, 100: 1, 200: 2 }, wgs: { 60: 2, 100: 2, 200: 2 }, raupe: { 60: 1, 100: 1, 200: 1 },
-    kniebrust: { 60: 1, 100: 2, 200: 1 }, sweep: { 60: 1, 100: 2, 200: 2 }, armkreisen: { 60: 1, 100: 1, 200: 1 },
+    hueftbeuger: { sprint: 2, weit: 2, wurf: 1 }, couch: { sprint: 2, weit: 2 }, quad: { sprint: 1, weit: 1 }, hamstring: { sprint: 2, weit: 2 },
+    hamstringband: { sprint: 2, weit: 1 }, wade: { sprint: 2, weit: 2 }, soleus: { sprint: 1, weit: 1 }, taube: { sprint: 1, weit: 1, kugel: 1, wurf: 1 },
+    schmetterling: { weit: 1, kugel: 1, wurf: 1 }, seitausfall: { sprint: 1, weit: 1, kugel: 2, wurf: 2 }, tractus: { sprint: 1 },
+    kind: { kugel: 1, wurf: 1 }, kobra: { weit: 1, wurf: 1 }, brust: { kugel: 2, wurf: 2 }, schulterquer: { kugel: 1, wurf: 2 }, flanke: { kugel: 1, wurf: 2 },
+    offenesbuch: { kugel: 2, wurf: 2 },
+    beinpendel: { sprint: 2, weit: 2 }, beinpendelseit: { sprint: 1, weit: 1, kugel: 1, wurf: 1 }, wgs: { sprint: 2, weit: 2, kugel: 1, wurf: 2 },
+    raupe: { sprint: 1, weit: 1 }, kniebrust: { sprint: 1, weit: 1 }, sweep: { sprint: 2, weit: 1 }, armkreisen: { sprint: 1, kugel: 2, wurf: 2 },
   };
   EX.forEach((e) => { e.disc = DISC_SCORES[e.id] || {}; });
   const DISCIPLINES = {
-    60: { label: "Sprint 60 m", focus: "Vor dem Start vor allem dynamisch: Hüftbeuger, Hüfte und Oberschenkelrückseite für eine tiefe, kraftvolle Startposition." },
-    100: { label: "Sprint 100 m", focus: "Große Schrittamplitude: Hüftbeuger, Oberschenkel hinten und Waden – dynamisch vorher, statisch danach." },
-    200: { label: "Sprint 200 m", focus: "Wie 100 m plus Kurve: seitliche Hüfte, Adduktoren und Waden/Achillessehne der Innenseite." },
+    sprint: { label: "Kurzsprint (60–200 m)", short: "Kurzsprint", focus: "Große Schrittamplitude: Hüftbeuger, Oberschenkel hinten und Waden – vor dem Training dynamisch, danach statisch." },
+    weit: { label: "Weitsprung", short: "Weitsprung", focus: "Wie im Sprint plus Absprungbein: Hüftbeuger und Waden/Achillessehne, dazu der Rücken für die Landung." },
+    kugel: { label: "Kugelstoßen", short: "Kugel", focus: "Brust und Schulter für die Stoßbewegung, Brustwirbelsäule und Adduktoren für Drehung und Auslage." },
+    wurf: { label: "Würfe (Speer, Diskus, Hammer)", short: "Würfe", focus: "Rotation der Brustwirbelsäule, Schulter und Flanke, dazu Hüfte und Adduktoren für die Drehung." },
   };
   const BY_ID = new Map(EX.map((e) => [e.id, e]));
 
