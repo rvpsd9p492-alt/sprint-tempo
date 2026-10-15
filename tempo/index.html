@@ -313,6 +313,19 @@ details .in{padding:0 16px 16px}
         <li>Aktion <b>Ergebnis anzeigen</b> – zeigt z. B. „Training gespeichert: 100 m in 12,4 s (Jochen)“.</li>
         <li>Unten auf <b>ⓘ</b> → <b>Auf Apple Watch zeigen</b> einschalten. Auf der Watch erscheint der Kurzbefehl in der App „Kurzbefehle“ und lässt sich als Komplikation aufs Zifferblatt legen.</li>
       </ol>
+      <h3 style="font:600 17px 'Barlow Condensed',sans-serif;margin:16px 0 4px">Variante: Kurzbefehl als Stoppuhr (ohne Eintippen)</h3>
+      <p class="note" style="margin-top:0">Zweiter Kurzbefehl <b>Training stoppen</b>: Strecke wählen, „Start“ und „Stopp“ antippen – die Zeit wird automatisch übertragen. <b>Vorher testen:</b> Einige Male parallel zur Stoppuhr-App stoppen. Weicht die Zeit um mehr als etwa 0,2 s ab, besser beim Eintippen bleiben.</p>
+      <ol class="wsteps">
+        <li>Neuer Kurzbefehl, Name <b>Training stoppen</b>.</li>
+        <li>Wie oben: Aktion <b>Liste</b> (50, 60, 80, 100, 150, 200, 250) und <b>Aus Liste auswählen</b>.</li>
+        <li>Aktion <b>Hinweis anzeigen</b>: Text <i>Start antippen</i>, „Abbrechen-Taste anzeigen“ aus.</li>
+        <li>Aktion <b>Aktuelles Datum</b>, dann <b>Datum formatieren</b>: Datumsformat <b>Eigene</b>, Formatzeichenfolge <code>A</code> (großes A = Millisekunden des Tages).</li>
+        <li>Aktion <b>Hinweis anzeigen</b>: Text <i>Stopp antippen</i>, „Abbrechen-Taste anzeigen“ aus.</li>
+        <li>Nochmals <b>Aktuelles Datum</b> und <b>Datum formatieren</b> mit <code>A</code>.</li>
+        <li>Aktion <b>Text</b>: Watch-Link + <code>&amp;d=</code> + <b>Gewähltes Objekt</b> + <code>&amp;s=</code> + erstes <b>Formatiertes Datum</b> + <code>&amp;e=</code> + zweites <b>Formatiertes Datum</b>.<br><span class="hint">Beim Einfügen der Variablen genau hinsehen: Die erste steht für den Start, die zweite für den Stopp.</span></li>
+        <li>Aktionen <b>Inhalte von URL abrufen</b> und <b>Ergebnis anzeigen</b>, dann <b>Auf Apple Watch zeigen</b> einschalten.</li>
+      </ol>
+      <p class="hint">Den Kurzbefehl vor dem Lauf öffnen und die Strecke wählen – erst dann aufs Startsignal „Start“ tippen. Kommt „Start/Stopp nicht lesbar“, unterstützt die Watch das Format <code>A</code> nicht; dann die erste Variante mit Eintippen verwenden.</p>
       <p class="hint">Gibt es nur einen Athleten, wird der Lauf ihm zugeordnet, sonst erscheint er oben unter „ohne Athlet“ zum Zuordnen.</p>
     </div>
   </details>
