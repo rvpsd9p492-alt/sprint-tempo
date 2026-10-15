@@ -265,7 +265,16 @@ details .in{padding:0 16px 16px}
   </section>
 
   </div>
-  <div class="tc-full">
+  </div>
+
+  <section aria-labelledby="runsHead" id="runsBox">
+    <h2 id="runsHead">Trainingsläufe</h2>
+    <div id="runsUn" hidden></div>
+    <div id="runsList"></div>
+    <p class="note" id="runsNote">Gestoppte Zeiten mit Intensität nach dem Modell oben. Neue Läufe per Apple Watch (unten) oder über „Gelaufene Zeit einordnen“ → „Als Trainingslauf speichern“.</p>
+  </section>
+
+  <div class="tc-full" id="modelBox">
   <details>
     <summary>Modell und Annahmen</summary>
     <div class="in">
@@ -294,14 +303,6 @@ details .in{padding:0 16px 16px}
     </div>
   </details>
   </div>
-  </div>
-
-  <section aria-labelledby="runsHead" id="runsBox">
-    <h2 id="runsHead">Trainingsläufe</h2>
-    <div id="runsUn" hidden></div>
-    <div id="runsList"></div>
-    <p class="note" id="runsNote">Gestoppte Zeiten mit Intensität nach dem Modell oben. Neue Läufe per Apple Watch (unten) oder über „Gelaufene Zeit einordnen“ → „Als Trainingslauf speichern“.</p>
-  </section>
 
   <details id="watchBox">
     <summary>Apple Watch – Trainingszeit per Kurzbefehl speichern</summary>
@@ -461,11 +462,11 @@ function render(){
   renderAth(); renderRuns();
   const err=$("err");
   if(M.error){
-    err.textContent=M.error; err.hidden=!!M.empty; $("calc").hidden=true;
+    err.textContent=M.error; err.hidden=!!M.empty; $("calc").hidden=true; $("modelBox").hidden=true;
     if(M.missing&&$("pbEdit").hidden) openPB();
     M=null; save(); return;
   }
-  err.hidden=true; $("calc").hidden=false;
+  err.hidden=true; $("calc").hidden=false; $("modelBox").hidden=false;
 
   setPressed("dist",S.dist); setPressed("start",S.start); setPressed("timing",S.timing);
   $("timing").querySelector('[data-v="race"]').disabled=(S.start!=="block");
