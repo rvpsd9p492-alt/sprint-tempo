@@ -100,6 +100,12 @@ input[type=number],input[type=text]{font:500 16px "Barlow",sans-serif;color:var(
 .board .zone{display:inline-block;margin-top:8px;background:var(--signal);color:var(--signal-ink);font-weight:600;font-size:14px;padding:3px 9px;border-radius:6px}
 input[type=range]{width:100%;accent-color:var(--signal);margin:14px 0 2px}
 .ticks{display:flex;justify-content:space-between;font-size:12px;opacity:.8}
+.board .last{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;width:100%;margin-top:10px;padding:8px 10px;border:1px solid rgba(255,255,255,.35);border-radius:10px;background:rgba(255,255,255,.08);color:inherit;font:500 14px "Barlow",sans-serif;text-align:left;cursor:pointer;font-variant-numeric:tabular-nums}
+.board .last b{font:700 20px "Barlow Condensed",sans-serif}
+.board .last .lp{margin-left:auto;font:700 18px "Barlow Condensed",sans-serif}
+.board .last.new{animation:lastNew 1.2s ease-in-out 3}
+@keyframes lastNew{50%{background:var(--signal);color:var(--signal-ink);border-color:var(--signal)}}
+@media (prefers-reduced-motion: reduce){.board .last.new{animation:none;background:var(--signal);color:var(--signal-ink)}}
 
 /* Tabelle */
 .lanes{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
@@ -249,6 +255,7 @@ details .in{padding:0 16px 16px}
     <span class="zone" id="bZone"></span>
     <input type="range" id="pct" min="60" max="100" step="1" aria-label="Intensität in Prozent">
     <div class="ticks"><span>60 %</span><span>70</span><span>80</span><span>90</span><span>100 %</span></div>
+    <button type="button" class="last" id="bLast" hidden></button>
   </div>
 
   <section aria-label="Intensitätstabelle">
@@ -478,6 +485,7 @@ function render(){
     $("bWin").textContent="Zielfenster "+fmt(t-tol)+"–"+fmt(t+tol)+" s ≙ "+fmt1(pSlow)+"–"+fmt1(Math.min(pFast,100))+" %";
   } else $("bWin").textContent="Zielfenster "+fmt(t-0.03)+"–"+fmt(t+0.03)+" s";
   $("bZone").textContent=zone(S.pct);
+  renderLast();
 
   $("tblHead").textContent="Sollzeiten "+D+" m";
   $("lanes").innerHTML=PCTS.map(p=>
@@ -641,6 +649,30 @@ $("wLink").addEventListener("click",async e=>{
     await loadWatch(true,true); $("wMsg").textContent="Neuer Link erstellt – im Kurzbefehl ersetzen.";
   }
 });
+
+/* Letzter Trainingslauf in der Anzeige; neue Läufe kurz hervorheben, Tipp übernimmt Strecke und Intensität */
+let lastShown=null;
+try{ lastShown=sessionStorage.getItem("laTempo.lastRun"); }catch(e){}
+function renderLast(){
+  const P=curAth(), r=P?LA.runs().find(x=>x.athleteId===P.a.id):null, el=$("bLast");
+  if(!r){ el.hidden=true; if(lastShown===null) lastShown=""; return; } // "" = noch kein Lauf: der erste neue wird hervorgehoben
+  const p=runPct(r), t=runTime(r);
+  el.hidden=false; el.dataset.id=r.id;
+  el.innerHTML="<span>Letzter Lauf"+(t?" · "+t+" Uhr":"")+(r.date!==new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10)?" · "+LA.fmtDate(r.date).slice(0,6):"")+"</span>"
+    +"<b>"+r.dist+" m · "+esc(r.mark)+" s</b>"+'<span class="lp">'+(p?fmt1(p)+" %":"–")+"</span>";
+  el.title=(p?zone(Math.min(p,100))+" · ":"")+"Antippen: Strecke und Intensität übernehmen";
+  if(lastShown!==null&&lastShown!==r.id){ el.classList.remove("new"); void el.offsetWidth; el.classList.add("new"); }
+  lastShown=r.id; try{ sessionStorage.setItem("laTempo.lastRun",r.id); }catch(e){}
+}
+$("bLast").addEventListener("click",()=>{
+  const r=LA.runs().find(x=>x.id===$("bLast").dataset.id); if(!r) return;
+  S.dist=r.dist; S.start=r.start; S.timing=r.timing; if(r.start==="fly") S.runin=r.runin; $("customD").value=DISTS.includes(r.dist)?"":r.dist;
+  const p=runPct(r); if(p) S.pct=Math.max(60,Math.min(100,Math.round(p)));
+  render();
+});
+
+/* Solange Sprint-Tempo sichtbar ist: alle 20 s abgleichen, damit Watch-Zeiten ohne Neuladen erscheinen */
+setInterval(()=>{ if(document.visibilityState==="visible"&&LA.cloud&&LA.cloud.status().loggedIn) LA.cloud.sync(); },20000);
 
 /* ---------- Start ---------- */
 buildChips(); bindSeg("start","start"); bindSeg("timing","timing"); fillSettings(); bindSettings();
