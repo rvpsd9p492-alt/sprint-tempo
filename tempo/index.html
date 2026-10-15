@@ -579,6 +579,11 @@ function runPct(r){
   const p=refFor(r.dist,r.start,r.runin)/(r.value-offFor(r.start,r.timing))*100;
   return isFinite(p)&&p>0?p:null;
 }
+// Uhrzeit der Erfassung (Postgres liefert Mikrosekunden und "+00:00" – Safari liest sicher nur Millisekunden)
+function runTime(r){
+  const d=new Date(String(r.createdAt||"").replace(/(\.\d{3})\d+/,"$1").replace(" ","T").replace(/([+-]\d{2})$/,"$1:00"));
+  return isNaN(d)?"":String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+}
 let delArm=null;
 function renderRuns(){
   const all=LA.runs(), un=all.filter(r=>!r.athleteId||!ATH.some(a=>a.id===r.athleteId)), P=curAth();
@@ -589,7 +594,7 @@ function renderRuns(){
   let h="", day="";
   mine.forEach(r=>{ if(r.date!==day){ day=r.date; h+='<div class="rday">'+LA.fmtDate(r.date)+(r.date===new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10)?" · heute":"")+"</div>"; }
     const p=runPct(r);
-    h+='<div class="rrow"><span class="rd">'+r.dist+' m</span><span class="rt">'+esc(r.mark)+' s</span><span class="ri">'+STARTS[r.start]+" · "+TIMS[r.timing]+(r.source==="watch"?" · Watch":"")+(p?"<br>"+zone(Math.min(p,100)):"")+'</span>'
+    h+='<div class="rrow"><span class="rd">'+r.dist+' m</span><span class="rt">'+esc(r.mark)+' s</span><span class="ri">'+(runTime(r)?"<b>"+runTime(r)+" Uhr</b> · ":"")+STARTS[r.start]+" · "+TIMS[r.timing]+(r.source==="watch"?" · Watch":"")+(p?"<br>"+zone(Math.min(p,100)):"")+'</span>'
       +'<span class="rp'+(p>100?" warn":"")+'">'+(p?fmt1(p)+" %":"–")+'</span><button class="rx'+(delArm===r.id?" armed":"")+'" data-del="'+esc(r.id)+'" aria-label="Lauf löschen">'+(delArm===r.id?"löschen?":"×")+"</button></div>"; });
   $("runsList").innerHTML=h||'<p class="note" style="margin-top:0">Noch keine Trainingsläufe für '+esc(P.name)+".</p>";
 }
