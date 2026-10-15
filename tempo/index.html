@@ -150,6 +150,19 @@ details .in{padding:0 16px 16px}
 .hintv{display:block;font-size:12px;color:var(--muted);margin-top:3px}
 .err{background:var(--warn);color:#fff;border-radius:10px;padding:10px 12px;margin-bottom:12px}
 .foot{font-size:13px;color:var(--muted);text-align:center;margin-top:16px}
+.hint{font-size:13px;color:var(--muted);margin:4px 0 0}
+.wsteps{margin:0;padding-left:20px;font-size:15px}
+.wsteps li{margin:5px 0}
+.wsteps code,.wfeed{font-size:13px;background:var(--bg);border-radius:6px;padding:1px 5px;overflow-wrap:anywhere}
+.wfeed{display:block;padding:8px 10px;margin-top:8px;color:var(--muted)}
+.rday{font:600 15px "Barlow Condensed",sans-serif;color:var(--muted);margin:10px 0 2px;letter-spacing:.3px}
+.rrow{display:flex;align-items:baseline;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.rrow .rd{flex:0 0 56px;font-weight:600}
+.rrow .rt{flex:0 0 auto;font:700 19px "Barlow Condensed",sans-serif}
+.rrow .ri{flex:1;min-width:0;font-size:13px;color:var(--muted)}
+.rrow .rp{font:700 17px "Barlow Condensed",sans-serif;white-space:nowrap}
+.rrow .rx{border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px;min-width:32px}
+.rrow .rx.armed{color:var(--warn);font-size:13px;font-weight:600}
 .back{display:inline-flex;align-items:center;gap:2px;color:var(--link);font:600 16px "Barlow",sans-serif;text-decoration:none;padding:6px 0;min-height:44px}
 .back::before{content:"‹";font-size:26px;line-height:1;margin-top:-3px}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
@@ -223,6 +236,8 @@ details .in{padding:0 16px 16px}
     <div class="inline" style="margin-top:0"><span>Gestoppt</span><input type="text" id="ran" inputmode="decimal" placeholder="s" autocomplete="off"> s</div>
     <div class="out" id="ranOut">–</div>
     <p class="note" id="ranNote">Gilt für die oben gewählte Strecke, Startart und Messung.</p>
+    <button class="btn" id="ranSave" style="margin-top:10px" hidden>Als Trainingslauf speichern</button>
+    <p class="note" id="ranMsg" aria-live="polite"></p>
   </section>
 
   </div>
@@ -273,6 +288,34 @@ details .in{padding:0 16px 16px}
   </details>
   </div>
   </div>
+
+  <section aria-labelledby="runsHead" id="runsBox">
+    <h2 id="runsHead">Trainingsläufe</h2>
+    <div id="runsUn" hidden></div>
+    <div id="runsList"></div>
+    <p class="note" id="runsNote">Gestoppte Zeiten mit Intensität nach dem Modell oben. Neue Läufe per Apple Watch (unten) oder über „Gelaufene Zeit einordnen“ → „Als Trainingslauf speichern“.</p>
+  </section>
+
+  <details id="watchBox">
+    <summary>Apple Watch – Trainingszeit per Kurzbefehl speichern</summary>
+    <div class="in">
+      <p class="note" style="margin-top:0">Mit der Stoppuhr der Watch stoppen, dann den Kurzbefehl „Training“ antippen: Strecke wählen, Zeit eingeben – fertig. Die Zeit wird als <b>Trainingslauf</b> (Hochstart, Handzeit) gespeichert, erscheint beim nächsten Abgleich oben in der Liste und zählt nicht zu den Wettkampfergebnissen.</p>
+      <div id="wLink"></div>
+      <p class="note" id="wMsg" aria-live="polite"></p>
+      <h3 style="font:600 17px 'Barlow Condensed',sans-serif;margin:14px 0 4px">Kurzbefehl einmalig auf dem iPhone anlegen</h3>
+      <ol class="wsteps">
+        <li>App <b>Kurzbefehle</b> öffnen → <b>+</b> → oben den Namen <b>Training</b> eingeben.</li>
+        <li>Aktion <b>Liste</b> hinzufügen, Einträge: <b>50, 60, 80, 100, 150, 200, 250</b> (je ein Eintrag).</li>
+        <li>Aktion <b>Aus Liste auswählen</b>, Eingabeaufforderung: <i>Strecke (m)</i>.</li>
+        <li>Aktion <b>Nach Eingabe fragen</b>: Frage <i>Zeit (s)</i>, Eingabetyp <b>Zahl</b>, „Dezimalzahlen erlauben“ ein.</li>
+        <li>Aktion <b>Text</b>: den Watch-Link einfügen und direkt dahinter <code>&amp;d=</code> + Variable <b>Gewähltes Objekt</b> + <code>&amp;z=</code> + Variable <b>Eingabe</b>.<br><span class="hint">Für Tiefstart zusätzlich <code>&amp;o=tief</code>, fliegend <code>&amp;o=fliegend</code>; für einen bestimmten Athleten <code>&amp;a=Name</code> anhängen.</span></li>
+        <li>Aktion <b>Inhalte von URL abrufen</b> (nimmt den Text als URL).</li>
+        <li>Aktion <b>Ergebnis anzeigen</b> – zeigt z. B. „Training gespeichert: 100 m in 12,4 s (Jochen)“.</li>
+        <li>Unten auf <b>ⓘ</b> → <b>Auf Apple Watch zeigen</b> einschalten. Auf der Watch erscheint der Kurzbefehl in der App „Kurzbefehle“ und lässt sich als Komplikation aufs Zifferblatt legen.</li>
+      </ol>
+      <p class="hint">Gibt es nur einen Athleten, wird der Lauf ihm zugeordnet, sonst erscheint er oben unter „ohne Athlet“ zum Zuordnen.</p>
+    </div>
+  </details>
 
   <section aria-label="Datensicherung">
     <p class="note" style="margin-top:0">Athleten werden zusammen mit den Wettkampfergebnissen auf der <a href="../" style="color:var(--link)">Übersichtsseite</a> gesichert und übertragen.</p>
@@ -355,15 +398,17 @@ function fitModel(){
 }
 
 /* Referenzzeit (100 %) in Bewegungszeit, ohne Messkorrektur */
-function refMove(D){
-  if(S.start==="fly") return M.tMove(D+S.runin)-M.tMove(S.runin);
-  return M.tMove(D)+(S.start==="hoch"?S.hochPen:0);
+function refFor(D,start,runin){
+  if(start==="fly") return M.tMove(D+runin)-M.tMove(runin);
+  return M.tMove(D)+(start==="hoch"?S.hochPen:0);
 }
-function measOffset(){
-  if(S.timing==="race") return S.start==="fly"?0:S.rt;
-  if(S.timing==="hand") return -(S.start==="fly"?S.handFly:S.handStd);
+function offFor(start,timing){
+  if(timing==="race") return start==="fly"?0:S.rt;
+  if(timing==="hand") return -(start==="fly"?S.handFly:S.handStd);
   return 0;
 }
+function refMove(D){ return refFor(D,S.start,S.runin); }
+function measOffset(){ return offFor(S.start,S.timing); }
 function target(D,p){return refMove(D)/(p/100)+measOffset();}
 function zone(p){
   if(p<75) return "Tempo extensiv";
@@ -393,7 +438,7 @@ function setPressed(id,val){[...$(id).querySelectorAll("button")].forEach(b=>b.s
 function render(){
   if(S.timing==="race"&&S.start!=="block") S.timing="elec";
   if(!M) M=fitModel();
-  renderAth();
+  renderAth(); renderRuns();
   const err=$("err");
   if(M.error){
     err.textContent=M.error; err.hidden=!!M.empty; $("calc").hidden=true;
@@ -431,10 +476,10 @@ function render(){
   const ran=num($("ran").value);
   if(ran>0){
     const p=refMove(D)/(ran-measOffset())*100;
-    $("ranOut").textContent=fmt1(p)+" %";
+    $("ranOut").textContent=fmt1(p)+" %"; $("ranSave").hidden=false;
     if(p>100) $("ranNote").innerHTML='<span class="warn">Schneller als die Modell-Bestleistung – Messung prüfen oder Bestzeiten aktualisieren.</span>';
     else $("ranNote").textContent=zone(p);
-  } else {$("ranOut").textContent="–";$("ranNote").textContent="Gilt für die oben gewählte Strecke, Startart und Messung.";}
+  } else {$("ranOut").textContent="–";$("ranNote").textContent="Gilt für die oben gewählte Strecke, Startart und Messung."; $("ranSave").hidden=true;}
 
   // Modell
   const v100=M.v(M.tMove(100));
@@ -514,6 +559,71 @@ $("pbResetBtn").addEventListener("click",()=>{
   LA.upsertAthlete(LA.resetToRecorded(JSON.parse(JSON.stringify(P.a)),RES)); ATH=LA.athletes(); M=null; render();
 });
 
+/* ---------- Trainingsläufe ---------- */
+const STARTS={block:"Tiefstart",hoch:"Hochstart",fly:"fliegend"}, TIMS={hand:"Hand",elec:"elektronisch"};
+function runPct(r){
+  if(!M||M.error) return null;
+  const p=refFor(r.dist,r.start,r.runin)/(r.value-offFor(r.start,r.timing))*100;
+  return isFinite(p)&&p>0?p:null;
+}
+let delArm=null;
+function renderRuns(){
+  const all=LA.runs(), un=all.filter(r=>!r.athleteId||!ATH.some(a=>a.id===r.athleteId)), P=curAth();
+  const mine=P?all.filter(r=>r.athleteId===P.a.id).slice(0,40):[];
+  $("runsUn").hidden=!(un.length&&P);
+  if(un.length&&P) $("runsUn").innerHTML='<p class="note" style="margin-top:0">'+un.length+" Trainingslauf"+(un.length===1?"":"läufe")+' ohne Athlet</p><button class="btn" id="runsAssign">'+esc(P.name)+" zuordnen</button>";
+  if(!P){ $("runsList").innerHTML=""; return; }
+  let h="", day="";
+  mine.forEach(r=>{ if(r.date!==day){ day=r.date; h+='<div class="rday">'+LA.fmtDate(r.date)+(r.date===new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10)?" · heute":"")+"</div>"; }
+    const p=runPct(r);
+    h+='<div class="rrow"><span class="rd">'+r.dist+' m</span><span class="rt">'+esc(r.mark)+' s</span><span class="ri">'+STARTS[r.start]+" · "+TIMS[r.timing]+(r.source==="watch"?" · Watch":"")+(p?"<br>"+zone(Math.min(p,100)):"")+'</span>'
+      +'<span class="rp'+(p>100?" warn":"")+'">'+(p?fmt1(p)+" %":"–")+'</span><button class="rx'+(delArm===r.id?" armed":"")+'" data-del="'+esc(r.id)+'" aria-label="Lauf löschen">'+(delArm===r.id?"löschen?":"×")+"</button></div>"; });
+  $("runsList").innerHTML=h||'<p class="note" style="margin-top:0">Noch keine Trainingsläufe für '+esc(P.name)+".</p>";
+}
+$("runsList").addEventListener("click",e=>{
+  const b=e.target.closest("[data-del]"); if(!b) return;
+  const id=b.dataset.del;
+  if(delArm!==id){ delArm=id; renderRuns(); setTimeout(()=>{ if(delArm===id){ delArm=null; renderRuns(); } },4000); return; }
+  delArm=null; LA.saveRuns(LA.runs().filter(r=>r.id!==id)); LA.trackDelete("settings","run:"+id); renderRuns();
+});
+$("runsUn").addEventListener("click",e=>{
+  if(e.target.id!=="runsAssign") return; const P=curAth(); if(!P) return;
+  const now=new Date().toISOString(), l=LA.runs();
+  l.forEach(r=>{ if(!r.athleteId||!ATH.some(a=>a.id===r.athleteId)){ r.athleteId=P.a.id; r.updatedAt=now; } }); LA.saveRuns(l); renderRuns();
+});
+$("ranSave").addEventListener("click",()=>{
+  const v=num($("ran").value), P=curAth(); if(!(v>0)||!P) return;
+  const now=new Date().toISOString();
+  LA.saveRuns(LA.runs().concat([{id:LA.newId("t"),athleteId:P.a.id,date:new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10),
+    dist:S.dist,value:v,mark:v.toFixed(2).replace(".",","),start:S.start,timing:S.timing==="race"?"elec":S.timing,runin:S.runin,source:"app",createdAt:now,updatedAt:now}]));
+  $("ranMsg").textContent="Gespeichert: "+S.dist+" m in "+fmt(v)+" s."; $("ran").value=""; render();
+});
+
+/* ---------- Apple Watch: Watch-Link für den Kurzbefehl ---------- */
+let wl=null, wErr="";
+function renderWatch(){
+  const c=LA.cloud&&LA.cloud.status();
+  if(!c||!c.configured||!c.loggedIn){ $("wLink").innerHTML='<p class="note" style="margin:0">Dafür bei der <a class="link" href="../#bkHead">Cloud-Sicherung</a> anmelden – der Kurzbefehl speichert direkt in die Cloud.</p>'; return; }
+  if(!wl){ $("wLink").innerHTML='<button class="btn primary" id="wMake">Watch-Link erstellen</button>'+(wErr?'<p class="err">'+esc(wErr)+"</p>":""); return; }
+  $("wLink").innerHTML='<span class="fl" style="margin-top:0">Dein Watch-Link</span><code class="wfeed" id="wUrl">'+esc(wl.url)+"</code>"
+    +'<div class="row" style="margin-top:8px"><button class="btn" id="wCopy">Link kopieren</button><button class="btn danger" id="wRenew">Neuer Link</button></div>'
+    +'<p class="hint">Mit diesem Link lassen sich Trainingsläufe in deinem Konto anlegen (nur 50–250 m) – nicht weitergeben. „Neuer Link“ macht den alten ungültig; dann den Link im Kurzbefehl ersetzen.</p>';
+}
+async function loadWatch(create,renew){
+  try{ wl=await LA.cloud.entryLink({create,renew}); wErr=""; }
+  catch(e){ wErr=e.code==="offline"?"Keine Internetverbindung.":"Watch-Link nicht verfügbar ("+(e.message||"Fehler")+")."; }
+  renderWatch();
+}
+$("watchBox").addEventListener("toggle",()=>{ if($("watchBox").open){ renderWatch(); if(LA.cloud&&LA.cloud.status().loggedIn&&!wl) loadWatch(false,false); } });
+$("wLink").addEventListener("click",async e=>{
+  if(e.target.id==="wMake"){ e.target.disabled=true; await loadWatch(true,false); if(wl) $("wMsg").textContent="Link erstellt – jetzt kopieren und im Kurzbefehl einfügen (Schritt 5)."; }
+  if(e.target.id==="wCopy"){ try{ await navigator.clipboard.writeText(wl.url); $("wMsg").textContent="Link kopiert."; }catch(err){ $("wMsg").textContent="Kopieren nicht möglich – Link markieren und kopieren."; } }
+  if(e.target.id==="wRenew"){
+    if(e.target.dataset.armed!=="1"){ e.target.dataset.armed="1"; e.target.textContent="Wirklich? Alter Link wird ungültig"; e.target.classList.add("armed"); return; }
+    await loadWatch(true,true); $("wMsg").textContent="Neuer Link erstellt – im Kurzbefehl ersetzen.";
+  }
+});
+
 /* ---------- Start ---------- */
 buildChips(); bindSeg("start","start"); bindSeg("timing","timing"); fillSettings(); bindSettings();
 $("runin").addEventListener("input",e=>{const v=+e.target.value;if(v>=5&&v<=60){S.runin=v;render();}});
@@ -529,7 +639,7 @@ const off=$("offState");
 window.addEventListener("pageshow",e=>{if(e.persisted) location.reload();});
 // Nach Cloud-Abgleich: Athleten, Ergebnisse und Stellschrauben neu einlesen
 window.addEventListener("la:synced",()=>{
-  ATH=LA.athletes(); RES=LA.results();
+  ATH=LA.athletes(); RES=LA.results(); renderRuns();
   const t=LA.load(LA.KEYS.tempo,{})||{}; SETKEYS.forEach(k=>{if(typeof t[k]==="number") S[k]=t[k];});
   sanitize(); fillSettings(); M=null; if($("pbEdit").hidden) render(); else renderAth();
 });

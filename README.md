@@ -7,7 +7,7 @@ Offline-Web-App mit mehreren Leichtathletik-Modulen.
 ## Module
 
 - **Athleten** (`athleten/`) – zentrale Athletenverwaltung für alle Module.
-- **Sprint-Tempo** (`tempo/`) – Trainings-Sollzeiten aus 60/100/200-m-Bestzeiten über ein physikalisches
+- **Sprint-Tempo** (`tempo/`) – Trainingsläufe (auch per Apple Watch) mit Intensität; Trainings-Sollzeiten aus 60/100/200-m-Bestzeiten über ein physikalisches
   Geschwindigkeitsmodell (Hill/Keller, Tibshirani 1997). Bestzeiten kommen automatisch aus den Wettkampfergebnissen
   der letzten 18 Monate (elektronisch, Wind ≤ +2,0); fehlende Werte manuell, Überschreiben und Zurücksetzen möglich.
 - **Wettkampfergebnisse** (`ergebnisse/`) – Ergebnisse mit Datum, Disziplin, Halle/Freiluft, Ergebnis, Wind,
@@ -56,10 +56,11 @@ Kalender-Abo: Migration `20261009100000_la_calendar_feed.sql` (Tabelle `la_calen
 Berechtigung). Wettkämpfe liegen in `la_records` als `kind = 'settings'`, `id = 'event:<id>'`, damit ältere
 App-Versionen sie ignorieren.
 
-Apple Watch: Migration `20261015100000_la_quick_result.sql` (Tabelle `la_entry_tokens`, Funktion `la_quick_result`) und
-Edge-Function `supabase/functions/la-result` (ohne JWT-Prüfung, eigener geheimer Watch-Link). Ein Kurzbefehl ruft
-`…/functions/v1/la-result?t=<Link>&d=<Strecke>&z=<Zeit>[&o=halle][&a=<Athlet>]` auf; erlaubt sind nur handgestoppte
-Ergebnisse über 50, 60, 80, 100, 150, 200 und 250 m. Anleitung in der App unter Wettkampfergebnisse → Apple Watch.
+Apple Watch: Migrationen `20261015100000_la_quick_result.sql` und `…120000_la_quick_result_runs.sql` (Tabelle
+`la_entry_tokens`, Funktion `la_quick_result`) und Edge-Function `supabase/functions/la-result` (ohne JWT-Prüfung,
+eigener geheimer Watch-Link). Ein Kurzbefehl ruft `…/functions/v1/la-result?t=<Link>&d=<Strecke>&z=<Zeit>[&o=tief|fliegend][&a=<Athlet>]`
+auf und legt einen **Trainingslauf** an (kind `settings`, id `run:<id>`; Strecken 50, 60, 80, 100, 150, 200, 250 m).
+Trainingsläufe und Anleitung stehen in Sprint-Tempo (Intensität nach dem Modell).
 
 Abgleich: je Athlet, Ergebnis, Wettkampf und Einstellung; neuere Änderung gewinnt (auch serverseitig per Trigger),
 Löschungen werden übertragen. Offline-Änderungen werden beim nächsten Online-Start nachgeholt.

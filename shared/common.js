@@ -1,9 +1,9 @@
 /* Gemeinsame Funktionen aller Leichtathletik-Module: Athleten, Ergebnisse, Bestzeiten, Sicherung, Offline. */
 (function () {
   "use strict";
-  const KEYS = { athletes: "laAthletes.v1", tempo: "sprintTempo.v1", results: "laResults.v1", events: "laEvents.v1", kraft: "laKraft.v1", dehnen: "laDehnen.v1", meta: "laMeta.v1",
+  const KEYS = { athletes: "laAthletes.v1", tempo: "sprintTempo.v1", results: "laResults.v1", events: "laEvents.v1", runs: "laRuns.v1", kraft: "laKraft.v1", dehnen: "laDehnen.v1", meta: "laMeta.v1",
     deleted: "laDeleted.v1", cloud: "laCloud.v1" };
-  const SYNCED = [KEYS.athletes, KEYS.results, KEYS.tempo, KEYS.events, KEYS.kraft, KEYS.dehnen];
+  const SYNCED = [KEYS.athletes, KEYS.results, KEYS.tempo, KEYS.events, KEYS.runs, KEYS.kraft, KEYS.dehnen];
   const TEMPO_SETTINGS = ["rt", "hochPen", "handStd", "handFly", "kExt", "tol"];
   /** Sprintstrecken, deren Bestzeiten Sprint-Tempo nutzt (Schlüssel = Strecke in m). */
   const SPRINT = { "60": "60 m", "100": "100 m", "200": "200 m", "400": "400 m" };
@@ -84,6 +84,9 @@
   function deleteAthlete(id) {
     saveAthletes(athletes().filter((a) => a.id !== id));
     trackDelete("athlete", id);
+    const rn = runs(); let rc = false;
+    rn.forEach((r) => { if (r.athleteId === id) { r.athleteId = null; r.updatedAt = new Date().toISOString(); rc = true; } });
+    if (rc) saveRuns(rn);
     Object.keys(PROGRAMS).forEach((pg) => { const all = progAll(pg);
       if (all[id]) { delete all[id]; save(PROGRAMS[pg], all); trackDelete("settings", pg + ":" + id); } });
     const res = results();
@@ -172,6 +175,23 @@
     L.push("END:VCALENDAR");
     return L.map(icsFold).join("\r\n") + "\r\n";
   }
+
+  /* ---------- Trainingsläufe (Sprint-Tempo, z. B. per Apple Watch gestoppt) ----------
+     { id, athleteId|null, date, dist (m), value (s), mark, start: "block"|"hoch"|"fly", timing: "hand"|"elec", runin, source, note, createdAt, updatedAt }
+     In der Cloud als kind "settings" mit id "run:<id>" (ältere App-Versionen ignorieren das). */
+  function cleanRun(r) {
+    if (!r || typeof r.id !== "string" || !isIsoDate(r.date)) return null;
+    const dist = Math.round(Number(r.dist)), value = Number(r.value);
+    if (!(dist >= 10 && dist <= 1000) || !(value > 0 && value < 3600)) return null;
+    return { id: r.id, athleteId: typeof r.athleteId === "string" ? r.athleteId : null, date: r.date, dist, value: Math.round(value * 100) / 100,
+      mark: String(r.mark || value.toFixed(2).replace(".", ",")).slice(0, 12), start: ["block", "hoch", "fly"].includes(r.start) ? r.start : "hoch",
+      timing: r.timing === "elec" ? "elec" : "hand", runin: Number(r.runin) > 0 ? Math.round(Number(r.runin)) : 20,
+      source: String(r.source || "app").slice(0, 12), note: String(r.note || "").slice(0, 120),
+      createdAt: r.createdAt || r.updatedAt || new Date().toISOString(), updatedAt: r.updatedAt || new Date().toISOString() };
+  }
+  function runs() { const l = load(KEYS.runs, []); return (Array.isArray(l) ? l : []).map(cleanRun).filter(Boolean)
+    .sort((a, b) => b.date.localeCompare(a.date) || String(b.createdAt).localeCompare(String(a.createdAt))); }
+  function saveRuns(list) { return save(KEYS.runs, list.map(cleanRun).filter(Boolean)); }
 
   /* ---------- Übungsprogramme je Athlet (Kräftigung, Dehnen) ----------
      { [athleteId]: { goal, level, phase, favs: [Übungs-id], over: { id: { sets, reps, load, note } }, log: [{ date, items: [{ id, sets }] }], updatedAt } }
@@ -502,7 +522,8 @@
     return set;
   }
   function fingerprint() {
-    const ev = load(KEYS.events, []), kr = load(KEYS.kraft, null), dh = load(KEYS.dehnen, null);
+    const ev = load(KEYS.events, []), kr = load(KEYS.kraft, null), dh = load(KEYS.dehnen, null), rn = load(KEYS.runs, null);
+    if (rn && rn.length) return hash(JSON.stringify({ a: load(KEYS.athletes, []), s: tempoSettings(), r: load(KEYS.results, []), e: ev, k: kr, d: dh, n: rn }));
     if (dh && Object.keys(dh).length) return hash(JSON.stringify({ a: load(KEYS.athletes, []), s: tempoSettings(), r: load(KEYS.results, []), e: ev, k: kr, d: dh }));
     if (kr && Object.keys(kr).length) return hash(JSON.stringify({ a: load(KEYS.athletes, []), s: tempoSettings(), r: load(KEYS.results, []), e: ev, k: kr }));
     return hash(JSON.stringify(Array.isArray(ev) && ev.length ? { a: load(KEYS.athletes, []), s: tempoSettings(), r: load(KEYS.results, []), e: ev }
@@ -540,7 +561,7 @@
 
   async function exportBackup() {
     const data = { app: "leichtathletik", v: 2, exported: new Date().toISOString(),
-      athletes: athletes(), tempoSettings: tempoSettings(), results: results(), events: events(), kraft: progAll("kraft"), dehnen: progAll("dehnen") };
+      athletes: athletes(), tempoSettings: tempoSettings(), results: results(), events: events(), runs: runs(), kraft: progAll("kraft"), dehnen: progAll("dehnen") };
     const name = "leichtathletik-sicherung-" + new Date().toISOString().slice(0, 10) + ".json";
     const res = await shareOrDownload(name, "application/json", JSON.stringify(data, null, 2));
     if (res !== "aborted") markBackedUp();
@@ -550,13 +571,14 @@
   /* Liest eine Sicherungsdatei (v2, v1 oder alte Sprint-Tempo-Sicherung) in ein einheitliches Format. */
   function parseBackup(text) {
     const d = JSON.parse(text);
-    const out = { athletes: [], tempoSettings: {}, results: [], events: [], kraft: {}, dehnen: {} };
+    const out = { athletes: [], tempoSettings: {}, results: [], events: [], runs: [], kraft: {}, dehnen: {} };
     const pickSettings = (src) => { TEMPO_SETTINGS.forEach((k) => { if (src && typeof src[k] === "number") out.tempoSettings[k] = src[k]; }); };
     if (d && d.app === "leichtathletik" && d.v >= 2) {
       out.athletes = (Array.isArray(d.athletes) ? d.athletes : []).map(cleanAthlete).filter(Boolean);
       pickSettings(d.tempoSettings);
       out.results = Array.isArray(d.results) ? d.results : [];
       out.events = (Array.isArray(d.events) ? d.events : []).map(cleanEvent).filter(Boolean);
+      out.runs = (Array.isArray(d.runs) ? d.runs : []).map(cleanRun).filter(Boolean);
       Object.keys(PROGRAMS).forEach((pg) => { if (d[pg] && typeof d[pg] === "object") Object.keys(d[pg]).forEach((id) => { const k = cleanProg(d[pg][id]); if (k) out[pg][id] = k; }); });
     } else if (d && d.app === "leichtathletik") {
       const t = d.tempo || {};
@@ -591,6 +613,8 @@
     saveResults(mr.list);
     const me = mergeById(events(), b.events || []);
     if (me.added + me.updated) saveEvents(me.list);
+    const mn = mergeById(runs(), b.runs || []);
+    if (mn.added + mn.updated) saveRuns(mn.list);
     Object.keys(PROGRAMS).forEach((pg) => { const all = progAll(pg), inc = b[pg] || {}; let n = 0;
       Object.keys(inc).forEach((id) => { if (!all[id] || String(inc[id].updatedAt) > String(all[id].updatedAt || "")) { all[id] = inc[id]; n++; } });
       if (n) save(PROGRAMS[pg], all); });
@@ -626,10 +650,11 @@
     athletes, saveAthletes, upsertAthlete, deleteAthlete, athleteName,
     results, saveResults, isWindy, isLegal,
     PROGRAMS, cleanProg, progAll, progFor, saveProg,
+    cleanRun, runs, saveRuns,
     EVENT_KINDS, cleanEvent, events, saveEvents, eventTitle, eventType, daysUntil, eventsToICS,
     DISCIPLINE_GROUPS, STANDARD_DISCIPLINES, DISC, discOrder, normalizeDiscipline, normalizeStoredDisciplines, better, markUnit, bestMarks, ageClass, resultClass, isIsoDate, exactAge,
     CHAMPIONSHIPS, INTL_CHAMPS, canonChamp, champRank, isIntlChamp, championships, titles, readTextFile, parseCSV, toCSV, headerIndex, parseDate, importPreview, columnCountWarnings,
     autoPBs, effectivePBs, setManual, resetToRecorded,
     backupStatus, exportBackup, parseBackup, applyBackup, shareOrDownload,
-    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.25" };
+    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.26" };
 })();

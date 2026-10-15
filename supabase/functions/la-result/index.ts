@@ -1,7 +1,7 @@
-// Schnelleingabe eines Ergebnisses, z. B. per Kurzbefehl auf der Apple Watch.
-// Aufruf: https://<projekt>.supabase.co/functions/v1/la-result?t=<Watch-Link-Schlüssel>&d=100&z=12,34[&o=halle][&a=Jochen]
+// Schnelleingabe eines Trainingslaufs (Sprint-Tempo), z. B. per Kurzbefehl auf der Apple Watch.
+// Aufruf: https://<projekt>.supabase.co/functions/v1/la-result?t=<Watch-Link-Schlüssel>&d=100&z=12,34[&o=tief|fliegend][&a=Jochen]
 // Der geheime Schlüssel ist die Berechtigung (Kurzbefehle können sich nicht anmelden) – deshalb ohne JWT-Prüfung.
-// Er darf nur ein handgestopptes Ergebnis über 50–250 m anlegen; Prüfen und Speichern übernimmt die
+// Er darf nur einen handgestoppten Trainingslauf über 50–250 m anlegen; Prüfen und Speichern übernimmt die
 // Datenbankfunktion la_quick_result. Antwort ist ein kurzer Text für die Uhr.
 
 Deno.serve(async (req: Request) => {

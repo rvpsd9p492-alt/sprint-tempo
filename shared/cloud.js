@@ -12,6 +12,7 @@
   const PAGE = 1000;
   // Wettkampfkalender: als kind "settings" mit id "event:<id>" – so ignorieren ältere App-Versionen diese Zeilen
   const EV = "event:";
+  const RUN = "run:"; // Trainingsläufe, ebenfalls als kind "settings"
   // Übungsprogramme je Athlet (Kräftigung, Dehnen), ebenfalls als kind "settings" mit id "<programm>:<athlet>"
   const PROGS = Object.keys(LA.PROGRAMS);
   // Datenbank-Limit des Supabase-Tarifs (Free: 500 MB) – über LA_CLOUD.dbLimitMB anpassbar
@@ -39,6 +40,7 @@
     LA.athletes().forEach((a) => { if (pushed["athlete:" + a.id] !== ms(a.updatedAt)) n++; });
     LA.results().forEach((r) => { if (pushed["result:" + r.id] !== ms(r.updatedAt)) n++; });
     LA.events().forEach((e) => { if (pushed["settings:" + EV + e.id] !== ms(e.updatedAt)) n++; });
+    LA.runs().forEach((r) => { if (pushed["settings:" + RUN + r.id] !== ms(r.updatedAt)) n++; });
     PROGS.forEach((pg) => { const all = LA.progAll(pg); Object.keys(all).forEach((id) => { if (pushed["settings:" + pg + ":" + id] !== ms(all[id].updatedAt)) n++; }); });
     n += (LA.load(K.deleted, []) || []).length;
     if (s.settingsHash !== settingsHash(LA.tempoSettings())) n++;
@@ -205,7 +207,8 @@
   function applyRemote(rows, s) {
     const pushed = s.pushed || (s.pushed = {});
     let ath = LA.athletes(), res = LA.results(), changedA = false, changedR = false, changedS = false, changedE = false;
-    const evs = LA.load(K.events, []) || [];
+    const evs = LA.load(K.events, []) || [], rns = LA.load(K.runs, []) || [];
+    let changedN = false;
     const prog = {}, changedP = {};
     PROGS.forEach((pg) => { prog[pg] = LA.progAll(pg); });
     const tomb = LA.load(K.deleted, []) || [];
@@ -219,6 +222,20 @@
         if (lt && ms(lt.at) > t) return;
         if (row.deleted) { if (local) { delete kr[id]; changedP[pg] = true; } }
         else if (row.data) { kr[id] = Object.assign({}, row.data, { updatedAt: new Date(t).toISOString() }); changedP[pg] = true; }
+        pushed[key] = t;
+        return;
+      }
+      if (row.kind === "settings" && row.id.startsWith(RUN)) {
+        const id = row.id.slice(RUN.length), i = rns.findIndex((x) => x.id === id), local = i >= 0 ? rns[i] : null;
+        if (local && ms(local.updatedAt) > t) return;
+        const lt = tomb.find((x) => x.kind === row.kind && x.id === row.id);
+        if (lt && ms(lt.at) > t) return;
+        if (row.deleted) { if (local) { rns.splice(i, 1); changedN = true; } }
+        else if (row.data) {
+          const rec = Object.assign({}, row.data, { id, updatedAt: new Date(t).toISOString() });
+          if (i >= 0) rns[i] = rec; else rns.push(rec);
+          changedN = true;
+        }
         pushed[key] = t;
         return;
       }
@@ -263,8 +280,9 @@
     if (changedA) localStorage.setItem(K.athletes, JSON.stringify(ath));
     if (changedR) localStorage.setItem(K.results, JSON.stringify(res));
     if (changedE) localStorage.setItem(K.events, JSON.stringify(evs));
+    if (changedN) localStorage.setItem(K.runs, JSON.stringify(rns));
     PROGS.forEach((pg) => { if (changedP[pg]) localStorage.setItem(LA.PROGRAMS[pg], JSON.stringify(prog[pg])); });
-    return changedA || changedR || changedS || changedE || Object.keys(changedP).length > 0;
+    return changedA || changedR || changedS || changedE || changedN || Object.keys(changedP).length > 0;
   }
 
   async function pull(sess, s) {
@@ -298,6 +316,7 @@
       if (pushed["result:" + r.id] !== ms(r.updatedAt)) add("result", r.id, r, r.updatedAt);
     });
     LA.events().forEach((e) => { if (pushed["settings:" + EV + e.id] !== ms(e.updatedAt)) add("settings", EV + e.id, e, e.updatedAt); });
+    LA.runs().forEach((r) => { if (pushed["settings:" + RUN + r.id] !== ms(r.updatedAt)) add("settings", RUN + r.id, r, r.updatedAt); });
     PROGS.forEach((pg) => { const all = LA.progAll(pg);
       Object.keys(all).forEach((id) => { if (pushed["settings:" + pg + ":" + id] !== ms(all[id].updatedAt)) add("settings", pg + ":" + id, all[id], all[id].updatedAt); }); });
     const tomb = LA.load(K.deleted, []) || [];
@@ -379,7 +398,7 @@
   }
 
   /* ---------- Watch-Link (Schnelleingabe per Kurzbefehl) ---------- */
-  // Eigener geheimer Link, getrennt vom Kalender-Abo, weil er Ergebnisse anlegen darf (Edge-Function "la-result").
+  // Eigener geheimer Link, getrennt vom Kalender-Abo, weil er Trainingsläufe anlegen darf (Edge-Function "la-result").
   async function entryLink(opts) {
     const sess = await token();
     let tok = null;

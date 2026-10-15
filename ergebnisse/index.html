@@ -50,10 +50,6 @@
 .chips button .dn{font-weight:700;color:var(--ok);margin-left:4px}
 .chips button[aria-pressed="true"] .dn{color:inherit}
 .chips button.more{border-style:dashed}
-.wsteps{margin:0;padding-left:20px;font-size:15px}
-.wsteps li{margin:5px 0}
-.wsteps code,.wfeed{font-size:13px;background:var(--bg);border-radius:6px;padding:1px 5px;overflow-wrap:anywhere}
-.wfeed{display:block;padding:8px 10px;margin-top:8px;color:var(--muted)}
 .formbtns{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
 .formbtns .primary{flex:1 1 auto}
 .chk{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:15px;cursor:pointer}
@@ -147,26 +143,6 @@
     <input type="file" id="csvFile" accept=".csv,text/csv,text/plain" hidden>
   </div>
   <section id="impBox" hidden></section>
-  <details id="watchBox" class="narrow" style="margin-top:12px">
-    <summary>Apple Watch – Zeit per Kurzbefehl speichern</summary>
-    <div class="in">
-      <p class="note" style="margin-top:0">Mit der Stoppuhr der Watch stoppen, dann den Kurzbefehl „Ergebnis“ antippen: Strecke wählen, Zeit eingeben – fertig. Das Ergebnis wird als <b>handgestoppt</b> gespeichert (zählt nicht als Bestleistung) und erscheint beim nächsten Abgleich hier.</p>
-      <div id="wLink"></div>
-      <p class="note" id="wMsg" aria-live="polite"></p>
-      <h3 style="font:600 17px 'Barlow Condensed',sans-serif;margin:14px 0 4px">Kurzbefehl einmalig auf dem iPhone anlegen</h3>
-      <ol class="wsteps">
-        <li>App <b>Kurzbefehle</b> öffnen → <b>+</b> → oben den Namen <b>Ergebnis</b> eingeben.</li>
-        <li>Aktion <b>Liste</b> hinzufügen, Einträge: <b>50, 60, 80, 100, 150, 200, 250</b> (je ein Eintrag).</li>
-        <li>Aktion <b>Aus Liste auswählen</b>, Eingabeaufforderung: <i>Strecke (m)</i>.</li>
-        <li>Aktion <b>Nach Eingabe fragen</b>: Frage <i>Zeit (s)</i>, Eingabetyp <b>Zahl</b>, „Dezimalzahlen erlauben“ ein.</li>
-        <li>Aktion <b>Text</b>: den Watch-Link einfügen und direkt dahinter <code>&amp;d=</code> + Variable <b>Gewähltes Objekt</b> + <code>&amp;z=</code> + Variable <b>Eingabe</b>.<br><span class="hint">Für Hallenergebnisse zusätzlich <code>&amp;o=halle</code>, für einen bestimmten Athleten <code>&amp;a=Name</code> anhängen.</span></li>
-        <li>Aktion <b>Inhalte von URL abrufen</b> (nimmt den Text als URL).</li>
-        <li>Aktion <b>Ergebnis anzeigen</b> – zeigt z. B. „Gespeichert: 100 m in 12,4 s (Jochen)“.</li>
-        <li>Unten auf <b>ⓘ</b> → <b>Auf Apple Watch zeigen</b> einschalten. Auf der Watch erscheint der Kurzbefehl in der App „Kurzbefehle“ und lässt sich als Komplikation aufs Zifferblatt legen.</li>
-      </ol>
-      <p class="hint">Gibt es nur einen Athleten, wird das Ergebnis ihm zugeordnet, sonst erscheint es oben unter „Ergebnisse ohne Athlet“.</p>
-    </div>
-  </details>
   <p class="note" style="text-align:center">Import: gleiche Spalten wie der Export (Athlet; Datum; Disziplin; Halle/Freiluft; Ergebnis; Wind; Sportfest; Meisterschaft; International; Platz; Kommentar …). Pflicht sind Datum, Disziplin und Ergebnis. Unbekannte Athleten werden angelegt, doppelte Ergebnisse übersprungen.</p>
   <p class="note" id="csvMsg" style="text-align:center"></p>
 
@@ -902,31 +878,6 @@ function route(){
 window.addEventListener("hashchange",route);
 window.addEventListener("la:synced",()=>{ R=LA.results(); ATH=LA.athletes(); if(!$("viewList").hidden) renderList(); });
 window.addEventListener("pageshow",e=>{ if(e.persisted){ R=LA.results(); ATH=LA.athletes(); route(); } });
-
-/* ---------- Apple Watch: Watch-Link für den Kurzbefehl ---------- */
-let wl=null, wErr="";
-function renderWatch(){
-  const c=LA.cloud&&LA.cloud.status();
-  if(!c||!c.configured||!c.loggedIn){ $("wLink").innerHTML='<p class="note" style="margin:0">Dafür bei der <a class="link" href="../#bkHead">Cloud-Sicherung</a> anmelden – der Kurzbefehl speichert direkt in die Cloud.</p>'; return; }
-  if(!wl){ $("wLink").innerHTML='<button class="btn primary" id="wMake">Watch-Link erstellen</button>'+(wErr?'<p class="err">'+esc(wErr)+"</p>":""); return; }
-  $("wLink").innerHTML='<span class="fl" style="margin-top:0">Dein Watch-Link</span><code class="wfeed" id="wUrl">'+esc(wl.url)+"</code>"
-    +'<div class="row" style="margin-top:8px"><button class="btn" id="wCopy">Link kopieren</button><button class="btn danger" id="wRenew">Neuer Link</button></div>'
-    +'<p class="hint">Mit diesem Link lassen sich Ergebnisse in deinem Konto anlegen (nur 50–250 m, handgestoppt) – nicht weitergeben. „Neuer Link“ macht den alten ungültig; dann den Link im Kurzbefehl ersetzen.</p>';
-}
-async function loadWatch(create,renew){
-  try{ wl=await LA.cloud.entryLink({create,renew}); wErr=""; }
-  catch(e){ wErr=e.code==="offline"?"Keine Internetverbindung.":"Watch-Link nicht verfügbar ("+(e.message||"Fehler")+")."; }
-  renderWatch();
-}
-$("watchBox").addEventListener("toggle",()=>{ if($("watchBox").open){ renderWatch(); if(LA.cloud&&LA.cloud.status().loggedIn&&!wl) loadWatch(false,false); } });
-$("wLink").addEventListener("click",async e=>{
-  if(e.target.id==="wMake"){ e.target.disabled=true; await loadWatch(true,false); if(wl) $("wMsg").textContent="Link erstellt – jetzt kopieren und im Kurzbefehl einfügen (Schritt 5)."; }
-  if(e.target.id==="wCopy"){ try{ await navigator.clipboard.writeText(wl.url); $("wMsg").textContent="Link kopiert."; }catch(err){ $("wMsg").textContent="Kopieren nicht möglich – Link markieren und kopieren."; } }
-  if(e.target.id==="wRenew"){
-    if(e.target.dataset.armed!=="1"){ e.target.dataset.armed="1"; e.target.textContent="Wirklich? Alter Link wird ungültig"; e.target.classList.add("armed"); return; }
-    await loadWatch(true,true); $("wMsg").textContent="Neuer Link erstellt – im Kurzbefehl ersetzen.";
-  }
-});
 
 $("ver").textContent=LA.VERSION;
 route();
