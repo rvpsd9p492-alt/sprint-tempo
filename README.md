@@ -56,6 +56,11 @@ Kalender-Abo: Migration `20261009100000_la_calendar_feed.sql` (Tabelle `la_calen
 Berechtigung). Wettkämpfe liegen in `la_records` als `kind = 'settings'`, `id = 'event:<id>'`, damit ältere
 App-Versionen sie ignorieren.
 
+Apple Watch: Migration `20261015100000_la_quick_result.sql` (Tabelle `la_entry_tokens`, Funktion `la_quick_result`) und
+Edge-Function `supabase/functions/la-result` (ohne JWT-Prüfung, eigener geheimer Watch-Link). Ein Kurzbefehl ruft
+`…/functions/v1/la-result?t=<Link>&d=<Strecke>&z=<Zeit>[&o=halle][&a=<Athlet>]` auf; erlaubt sind nur handgestoppte
+Ergebnisse über 50, 60, 80, 100, 150, 200 und 250 m. Anleitung in der App unter Wettkampfergebnisse → Apple Watch.
+
 Abgleich: je Athlet, Ergebnis, Wettkampf und Einstellung; neuere Änderung gewinnt (auch serverseitig per Trigger),
 Löschungen werden übertragen. Offline-Änderungen werden beim nächsten Online-Start nachgeholt.
 

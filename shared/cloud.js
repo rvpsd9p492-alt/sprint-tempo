@@ -378,6 +378,23 @@
     return { https, webcal: https.replace(/^https?:/, "webcal:") };
   }
 
+  /* ---------- Watch-Link (Schnelleingabe per Kurzbefehl) ---------- */
+  // Eigener geheimer Link, getrennt vom Kalender-Abo, weil er Ergebnisse anlegen darf (Edge-Function "la-result").
+  async function entryLink(opts) {
+    const sess = await token();
+    let tok = null;
+    if (!(opts && opts.renew)) {
+      const rows = await http("/rest/v1/la_entry_tokens?select=token", { token: sess.access_token });
+      tok = Array.isArray(rows) && rows[0] ? rows[0].token : null;
+    }
+    if (!tok && opts && opts.create) {
+      tok = newToken();
+      await http("/rest/v1/la_entry_tokens?on_conflict=user_id", { method: "POST", token: sess.access_token,
+        body: [{ user_id: sess.user_id, token: tok }], headers: { Prefer: "resolution=merge-duplicates,return=minimal" } });
+    }
+    return tok ? { url: URL_ + "/functions/v1/la-result?t=" + tok } : null;
+  }
+
   window.addEventListener("la:changed", (e) => {
     // Sprint-Tempo speichert bei jeder Bedienung; nur geänderte Stellschrauben sind relevant
     if (e.detail && e.detail.key === K.tempo && settingsHash(LA.tempoSettings()) === st().settingsHash) return;
@@ -387,5 +404,5 @@
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") schedule(300); });
   if (configured) setTimeout(() => sync(), 300);
 
-  LA.cloud = { configured, status, signIn, signUp, signOut, sync, storageInfo, calendarLink, requestPasswordReset, readRecoveryLink, updatePassword, onStatus: (fn) => { listeners.add(fn); return () => listeners.delete(fn); } };
+  LA.cloud = { configured, status, signIn, signUp, signOut, sync, storageInfo, calendarLink, entryLink, requestPasswordReset, readRecoveryLink, updatePassword, onStatus: (fn) => { listeners.add(fn); return () => listeners.delete(fn); } };
 })();
