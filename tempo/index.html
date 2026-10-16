@@ -315,13 +315,27 @@ details .in{padding:0 16px 16px}
         <li>App <b>Kurzbefehle</b> öffnen → <b>+</b> → oben den Namen <b>Training</b> eingeben.</li>
         <li>Aktion <b>Liste</b> hinzufügen, Einträge: <b>50, 60, 80, 100, 150, 200, 250</b> (je ein Eintrag).</li>
         <li>Aktion <b>Aus Liste auswählen</b>, Eingabeaufforderung: <i>Strecke (m)</i>.</li>
-        <li>Aktion <b>Nach Eingabe fragen</b>: Frage <i>Zeit (s)</i>, Eingabetyp <b>Zahl</b>, „Dezimalzahlen erlauben“ ein.</li>
+        <li>Aktion <b>Nach Eingabe fragen</b>: Frage <i>Zeit (s)</i>, Eingabetyp <b>Text</b> (mit „Zahl“ bricht der Kurzbefehl auf der Watch ab).</li>
         <li>Aktion <b>Text</b>: den Watch-Link einfügen und direkt dahinter <code>&amp;d=</code> + Variable <b>Gewähltes Objekt</b> + <code>&amp;z=</code> + Variable <b>Eingabe</b>.<br><span class="hint">Für Tiefstart zusätzlich <code>&amp;o=tief</code>, fliegend <code>&amp;o=fliegend</code>; für einen bestimmten Athleten <code>&amp;a=Name</code> anhängen.</span></li>
         <li>Aktion <b>Inhalte von URL abrufen</b> (nimmt den Text als URL).</li>
         <li>Aktion <b>Ergebnis anzeigen</b> – zeigt z. B. „Training gespeichert: 100 m in 12,4 s (Jochen)“.</li>
         <li>Unten auf <b>ⓘ</b> → <b>Auf Apple Watch zeigen</b> einschalten. Auf der Watch erscheint der Kurzbefehl in der App „Kurzbefehle“ und lässt sich als Komplikation aufs Zifferblatt legen.</li>
       </ol>
-      <h3 style="font:600 17px 'Barlow Condensed',sans-serif;margin:16px 0 4px">Variante: Kurzbefehl als Stoppuhr (ohne Eintippen)</h3>
+      <h3 style="font:600 17px 'Barlow Condensed',sans-serif;margin:16px 0 4px">Variante: Zeit aus Listen wählen (große Tasten auf der Watch)</h3>
+      <p class="note" style="margin-top:0">Statt zu tippen wählst du Sekunden und Zehntel aus zwei Listen – große Zeilen, Blättern mit der Krone. Die Listen unten kopieren und jeweils in eine Aktion <b>Text</b> einfügen.</p>
+      <div class="row" style="margin:6px 0 4px"><button class="btn" type="button" data-copy="sec">Sekunden 5–50 kopieren</button><button class="btn" type="button" data-copy="ten">Zehntel 0–9 kopieren</button></div>
+      <ol class="wsteps">
+        <li>Neuer Kurzbefehl, Name z. B. <b>Training</b> (oder den bisherigen umbauen).</li>
+        <li><b>Liste</b> (50, 60, 80, 100, 150, 200, 250) → <b>Aus Liste auswählen</b> (<i>Strecke</i>) → <b>Variable festlegen</b>: Name <b>Strecke</b>.</li>
+        <li><b>Text</b> mit der Sekundenliste → <b>Text teilen</b> (Trennzeichen: <b>Neue Zeilen</b>) → <b>Aus Liste auswählen</b> (<i>Sekunden</i>) → <b>Variable festlegen</b>: <b>Sek</b>.</li>
+        <li><b>Text</b> mit der Zehntelliste → <b>Text teilen</b> (<b>Neue Zeilen</b>) → <b>Aus Liste auswählen</b> (<i>Zehntel</i>) → <b>Variable festlegen</b>: <b>Zehntel</b>.</li>
+        <li><b>Text</b>: Watch-Link + <code>&amp;d=</code> + Variable <b>Strecke</b> + <code>&amp;z=</code> + <b>Sek</b> + <code>,</code> + <b>Zehntel</b>.</li>
+        <li><b>Inhalte von URL abrufen</b> → <b>Ergebnis anzeigen</b>, dann <b>Auf Apple Watch zeigen</b> einschalten.</li>
+      </ol>
+      <p class="hint">Beispiel: 12 und 5 gewählt → gespeichert als 12,5 s.</p>
+
+      <h3 style="font:600 17px 'Barlow Condensed',sans-serif;margin:16px 0 4px">Variante: Kurzbefehl als Stoppuhr – nur iPhone</h3>
+      <p class="note warn" style="margin-top:0">Auf der Apple Watch funktioniert diese Variante nicht: Die Watch liefert das Datumsformat „A“ leer, es wird nichts gespeichert. Auf dem iPhone klappt sie.</p>
       <p class="note" style="margin-top:0">Zweiter Kurzbefehl <b>Training stoppen</b>: Strecke wählen, „Start“ und „Stopp“ antippen – die Zeit wird automatisch übertragen. <b>Vorher testen:</b> Einige Male parallel zur Stoppuhr-App stoppen. Weicht die Zeit um mehr als etwa 0,2 s ab, besser beim Eintippen bleiben.</p>
       <ol class="wsteps">
         <li>Neuer Kurzbefehl, Name <b>Training stoppen</b>.</li>
@@ -641,6 +655,13 @@ async function loadWatch(create,renew){
   catch(e){ wErr=e.code==="offline"?"Keine Internetverbindung.":"Watch-Link nicht verfügbar ("+(e.message||"Fehler")+")."; }
   renderWatch();
 }
+// Listen für die Auswahl-Variante in die Zwischenablage (je Zeile ein Wert)
+$("watchBox").addEventListener("click",async e=>{
+  const b=e.target.closest("[data-copy]"); if(!b) return;
+  const n=b.dataset.copy==="sec"?Array.from({length:46},(_,i)=>String(i+5)):Array.from({length:10},(_,i)=>String(i));
+  try{ await navigator.clipboard.writeText(n.join("\n")); $("wMsg").textContent=(b.dataset.copy==="sec"?"Sekunden 5–50":"Zehntel 0–9")+" kopiert – im Kurzbefehl in eine Aktion „Text“ einfügen."; }
+  catch(err){ $("wMsg").textContent="Kopieren nicht möglich: "+n.join(", "); }
+});
 $("watchBox").addEventListener("toggle",()=>{ if($("watchBox").open){ renderWatch(); if(LA.cloud&&LA.cloud.status().loggedIn&&!wl) loadWatch(false,false); } });
 $("wLink").addEventListener("click",async e=>{
   if(e.target.id==="wMake"){ e.target.disabled=true; await loadWatch(true,false); if(wl) $("wMsg").textContent="Link erstellt – jetzt kopieren und im Kurzbefehl einfügen (Schritt 5)."; }
