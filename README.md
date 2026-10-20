@@ -60,7 +60,8 @@ Apple Watch: Migrationen `20261015100000_la_quick_result.sql` und `…120000_la_
 `la_entry_tokens`, Funktion `la_quick_result`) und Edge-Function `supabase/functions/la-result` (ohne JWT-Prüfung,
 eigener geheimer Watch-Link). Ein Kurzbefehl ruft `…/functions/v1/la-result?t=<Link>&d=<Strecke>&z=<Zeit>[&o=tief|fliegend][&a=<Athlet>]`
 auf (Stoppuhr-Variante: `&s=<Start>&e=<Stopp>` in Millisekunden des Tages, die Funktion bildet die Differenz)
-und legt einen **Trainingslauf** an (kind `settings`, id `run:<id>`; Strecken 50, 60, 80, 100, 150, 200, 250 m).
+und legt über `la_quick_result2` (Migration `20261020090000_la_quick_result2.sql`) einen **Trainingslauf** an;
+die Antwort enthält die Intensität nach dem Sprint-Tempo-Modell (Bestzeiten und Stellschrauben aus der Datenbank) (kind `settings`, id `run:<id>`; Strecken 50, 60, 80, 100, 150, 200, 250 m).
 Trainingsläufe und Anleitung stehen in Sprint-Tempo (Intensität nach dem Modell).
 
 Abgleich: je Athlet, Ergebnis, Wettkampf und Einstellung; neuere Änderung gewinnt (auch serverseitig per Trigger),
