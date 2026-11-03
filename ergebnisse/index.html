@@ -74,6 +74,58 @@
 #chInfo{font-size:14px;min-height:20px;margin-top:6px;font-variant-numeric:tabular-nums}
 .pbs .who{font:600 15px "Barlow",sans-serif;color:var(--muted);padding-top:12px}
 .link{color:var(--link);font:600 14px "Barlow",sans-serif;text-decoration:none}
+/* Ziele & Einordnung */
+.gopen{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;background:var(--surface);border:0;border-radius:14px;padding:14px;margin-bottom:12px;color:var(--ink);font:600 17px "Barlow",sans-serif;text-decoration:none}
+.gopen small{display:block;font:500 13px "Barlow",sans-serif;color:var(--muted);margin-top:2px}
+.gopen::after{content:"›";font-size:26px;color:var(--muted)}
+.ghead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ghead h2{margin:0}
+.ghero{margin:12px 0 4px}
+.ghk{font:600 13px "Barlow",sans-serif;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.ghrow{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.ghv{background:var(--signal);color:var(--signal-ink);font:800 64px/1 "Barlow Condensed",sans-serif;padding:4px 14px 0;border-radius:6px;font-variant-numeric:tabular-nums}
+.ghd{font:700 16px "Barlow Condensed",sans-serif;letter-spacing:1px;text-transform:uppercase;padding-bottom:6px}
+.gcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:12px}
+.gcard{border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.gcard .gd{font:700 15px "Barlow Condensed",sans-serif;letter-spacing:1px;text-transform:uppercase}
+.gcard .gpb{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.gcard .gpb span{font-size:12px}
+.gcard .gv{font:800 40px/1.05 "Barlow Condensed",sans-serif;font-variant-numeric:tabular-nums;margin-top:2px}
+.gcard .gl{font-size:13px;color:var(--muted)}
+.gcard .gst{font-size:13px;font-weight:600;margin-top:2px}
+.gcard .gst.ok{color:var(--ok)}
+.gult{display:flex;justify-content:space-between;align-items:baseline;background:var(--signal);color:var(--signal-ink);border-radius:7px;padding:4px 9px;margin-top:8px}
+.gult span{font:700 12px "Barlow",sans-serif;letter-spacing:1px;text-transform:uppercase}
+.gult b{font:800 20px "Barlow Condensed",sans-serif}
+.gedit{border-top:1px solid var(--line);margin-top:14px;padding-top:6px}
+.gedit h3{font:600 18px "Barlow Condensed",sans-serif;margin:8px 0}
+.grow{border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:6px}
+.grow .err{margin:0}
+.glegend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted);margin:8px 0 2px}
+.glegend span{display:inline-flex;align-items:center;gap:5px}
+.glegend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.glegend i.w{background:var(--ink)} .glegend i.g{background:var(--clay)}
+.gstand{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:12px}
+.gsh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.gsh b{font:800 24px "Barlow Condensed",sans-serif}
+.gsh span{font:600 13px "Barlow",sans-serif;color:var(--muted);letter-spacing:.3px;font-variant-numeric:tabular-nums}
+.gends{display:flex;justify-content:space-between;font:600 11px "Barlow",sans-serif;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:6px}
+.gaxis{width:100%}
+.gaxis svg{display:block}
+.gaxis .ax{stroke:var(--ink);stroke-width:2.5}
+.gaxis .tw{stroke:var(--ink);stroke-width:1.5} .gaxis .tg{stroke:var(--clay);stroke-width:1.5}
+.gaxis text{text-anchor:middle;font-variant-numeric:tabular-nums}
+.gaxis .vw,.gaxis .vg{font:600 12px "Barlow",sans-serif} .gaxis .vw{fill:var(--ink)} .gaxis .vg{fill:var(--clay)}
+.gaxis .lw,.gaxis .lg{font:700 9px "Barlow",sans-serif;letter-spacing:.6px;text-transform:uppercase} .gaxis .lw{fill:var(--ink)} .gaxis .lg{fill:var(--clay)}
+.gaxis .ml{stroke:var(--ink);stroke-width:1.5}
+.gaxis .md{fill:var(--signal);stroke:var(--ink);stroke-width:2}
+.gaxis .mg,.gaxis .mo{fill:var(--signal);stroke:var(--ink);stroke-width:1}
+.gaxis .mo{fill:var(--surface);stroke-width:1.5}
+.gaxis .mt{font:700 12px "Barlow",sans-serif;fill:var(--ink)}
+.gaxis .mg+.mt{fill:var(--signal-ink)}
+.gsrc{font-size:13px;margin-top:4px}
+.gsrc .link{background:none;border:0;padding:3px 0;cursor:pointer;text-align:left}
+#rList{margin:6px 0 4px}
 </style>
 </head>
 <body>
@@ -91,6 +143,7 @@
 
   <div class="split">
   <div class="side">
+  <a class="gopen" href="#ziele" id="goalsBtn"><span>Ziele &amp; Einordnung<small id="goalsSum">Ziele je Jahr, Vergleich mit DLV- und WMA-Bestenliste</small></span></a>
   <section aria-label="Filter" id="filterBox">
     <div class="grid2">
       <div style="grid-column:1/-1"><label class="fl" for="fAth" style="margin-top:0">Athlet</label><select id="fAth"></select></div>
@@ -149,6 +202,19 @@
   <p class="foot">Version <span id="ver"></span> · <span id="offState">Offline-Modus wird vorbereitet …</span></p>
 
   <a class="btn primary block fab" href="#neu" id="addBtn">+ Ergebnis erfassen</a>
+</div>
+
+<!-- ============ Ziele & Einordnung ============ -->
+<div id="viewGoals" class="narrow" hidden>
+  <div class="topbar"><a class="back" href="#" id="gBack">Ergebnisse</a></div>
+  <h1>Ziele &amp; Einordnung</h1>
+  <p class="sub" id="gSub"></p>
+  <div class="grid2">
+    <div><label class="fl" for="gAth" style="margin-top:0">Athlet</label><select id="gAth"></select></div>
+    <div><label class="fl" for="gYear" style="margin-top:0">Jahr</label><select id="gYear"></select></div>
+  </div>
+  <div id="gBody"></div>
+  <p class="note">Jahresbestleistung (SB) und PB ohne Rückenwind über +2,0 m/s und ohne Handzeiten. Bestenlisten werden nicht automatisch geladen: Zeiten aus der DLV- bzw. WMA-Liste der Altersklasse einfügen.</p>
 </div>
 
 <!-- ============ Formular ============ -->
@@ -260,6 +326,7 @@
 <script src="../shared/config.js"></script>
 <script src="../shared/common.js"></script>
 <script src="../shared/cloud.js"></script>
+<script src="../shared/ziele.js"></script>
 <script>
 (function(){
 "use strict";
@@ -285,37 +352,7 @@ let F=Object.assign({},NOF,LA.load(FKEY,{}));
 const akOf=r=>{ const c=LA.resultClass(r,ATH); return c?c.label:""; };
 
 /* ---------- Ergebnis lesen & formatieren ---------- */
-const STATUS={DNF:"DNF",AUFG:"DNF",DNS:"DNS",DQ:"DQ",DISQ:"DQ",NM:"o.g.V.",OGV:"o.g.V.",NHL:"o.g.V."};
-function parseMark(raw,kind){
-  const s=String(raw||"").trim();
-  if(!s) return {err:"Ergebnis fehlt."};
-  const code=s.toUpperCase().replace(/[\s.]/g,"");
-  if(STATUS[code]) return {mark:STATUS[code],value:null};
-  let n=s.replace(/\s/g,"").replace(/(min|sek|sec|pkt|punkte|s|m)\.?$/i,"");
-  if(kind==="t"){
-    n=n.replace(/[.,](?=\d{1,3}$)/,",");
-    const [main,frac,extra]=n.split(",");
-    if(extra!==undefined||!main) return {err:"Zeit bitte wie 11,42 oder 1:58,32 eingeben."};
-    const segs=main.split(/[:.]/);
-    if(segs.length>3||segs.some(x=>!/^\d+$/.test(x))||(frac!==undefined&&!/^\d{1,3}$/.test(frac)))
-      return {err:"Zeit bitte wie 11,42 oder 1:58,32 eingeben."};
-    for(let i=1;i<segs.length;i++) if(+segs[i]>59||segs[i].length!==2) return {err:"Minuten/Sekunden nach dem Doppelpunkt zweistellig (00–59)."};
-    let sec=0; segs.forEach(x=>{sec=sec*60+(+x);});
-    const value=sec+(frac?+("0."+frac):0);
-    if(!(value>0)) return {err:"Zeit muss größer als 0 sein."};
-    const mark=segs.map((x,i)=>i===0?String(+x):x).join(":")+(frac!==undefined?","+frac:"");
-    return {mark,value};
-  }
-  if(kind==="d"){
-    if(!/^\d{1,3}([.,]\d{1,2})?$/.test(n)) return {err:"Weite/Höhe in Metern, z. B. 6,45."};
-    const value=+n.replace(",",".");
-    if(!(value>0&&value<150)) return {err:"Weite/Höhe unplausibel."};
-    return {mark:value.toFixed(2).replace(".",","),value};
-  }
-  if(!/^\d{1,5}$/.test(n.replace(/\./g,""))) return {err:"Punkte als ganze Zahl, z. B. 5432."};
-  const value=+n.replace(/\./g,"");
-  return {mark:String(value),value};
-}
+const parseMark=LA.parseMark;
 const unit=LA.markUnit;
 function parseWind(raw,sign){
   const s=String(raw||"").trim().replace(",",".").replace("−","-");
@@ -377,6 +414,7 @@ function filtered(){
     .sort((a,b)=>b.date.localeCompare(a.date)||String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 function renderList(){
+  goalsSummary();
   buildFilters();
   const list=filtered(), active=!!(F.ath||F.year||F.disc||F.champ||F.venue||F.ak);
   const single=!!F.ath; // nur ein Athlet sichtbar → Namen nicht wiederholen
@@ -529,6 +567,13 @@ $("csvFile").addEventListener("change",async e=>{
     }});
 });
 
+function goalsSummary(){ // Kurzinfo auf dem Einstieg „Ziele & Einordnung“
+  const aid=chartAthlete()||(ATH.length?ATH[0].id:null), y=new Date().getFullYear();
+  const gs=aid?LA.progFor("ziele",aid).goals.filter(g=>g.year===y||g.year===y+1):[];
+  const yy=gs.some(g=>g.year===y)?y:y+1, txt=gs.filter(g=>g.year===yy).sort((a,b)=>discOrder(a.disc)-discOrder(b.disc)).slice(0,3).map(g=>g.disc+" "+g.goal).join(" · ");
+  $("goalsSum").textContent=txt?"Ziele "+yy+": "+txt:"Ziele je Jahr, Vergleich mit DLV- und WMA-Bestenliste";
+  $("goalsBtn").hidden=!ATH.length;
+}
 /* ---------- Leistungsentwicklung (SVG, ohne Bibliothek) ---------- */
 let chDisc=null, chPts=[];
 const MON=["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
@@ -851,6 +896,7 @@ $("fDel").addEventListener("click",()=>{
 });
 $("fCancel").addEventListener("click",closeForm);
 $("fCancelTop").addEventListener("click",e=>{e.preventDefault(); closeForm();});
+$("gBack").addEventListener("click",e=>{e.preventDefault(); closeForm();});
 
 /* ---------- Navigation (#neu, #bearbeiten/<id>) ---------- */
 let listScroll=0, fromList=false;
@@ -863,13 +909,21 @@ $("addBtn").addEventListener("click",e=>{e.preventDefault(); go("#neu");});
 function route(){
   const h=location.hash;
   const m=h.match(/^#bearbeiten\/(.+)$/), w=h.match(/^#neu\/wk\/(.+)$/);
+  if(h==="#ziele"){
+    if(!$("viewList").hidden){ listScroll=window.scrollY; fromList=true; }
+    $("viewList").hidden=true; $("viewForm").hidden=true; $("viewGoals").hidden=false;
+    LA_ZIELE.show(chartAthlete()||(F.ath!=="__none"?F.ath:""));
+    window.scrollTo(0,0);
+    return;
+  }
+  $("viewGoals").hidden=true;
   if(h==="#neu"||m||w){
     if(!$("viewList").hidden){ listScroll=window.scrollY; fromList=true; }
     $("viewList").hidden=true; $("viewForm").hidden=false;
     openForm(m?decodeURIComponent(m[1]):null,w?decodeURIComponent(w[1]):null);
     window.scrollTo(0,0);
   } else {
-    const wasForm=!$("viewForm").hidden;
+    const wasForm=!$("viewForm").hidden||fromList;
     $("viewForm").hidden=true; $("viewList").hidden=false; fromList=false;
     renderList();
     if(wasForm) window.scrollTo(0,listScroll);

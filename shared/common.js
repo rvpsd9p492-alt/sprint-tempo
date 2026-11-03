@@ -1,9 +1,9 @@
 /* Gemeinsame Funktionen aller Leichtathletik-Module: Athleten, Ergebnisse, Bestzeiten, Sicherung, Offline. */
 (function () {
   "use strict";
-  const KEYS = { athletes: "laAthletes.v1", tempo: "sprintTempo.v1", results: "laResults.v1", events: "laEvents.v1", runs: "laRuns.v1", kraft: "laKraft.v1", dehnen: "laDehnen.v1", meta: "laMeta.v1",
+  const KEYS = { athletes: "laAthletes.v1", tempo: "sprintTempo.v1", results: "laResults.v1", events: "laEvents.v1", runs: "laRuns.v1", kraft: "laKraft.v1", dehnen: "laDehnen.v1", ziele: "laZiele.v1", rang: "laRang.v1", meta: "laMeta.v1",
     deleted: "laDeleted.v1", cloud: "laCloud.v1" };
-  const SYNCED = [KEYS.athletes, KEYS.results, KEYS.tempo, KEYS.events, KEYS.runs, KEYS.kraft, KEYS.dehnen];
+  const SYNCED = [KEYS.athletes, KEYS.results, KEYS.tempo, KEYS.events, KEYS.runs, KEYS.kraft, KEYS.dehnen, KEYS.ziele, KEYS.rang];
   const TEMPO_SETTINGS = ["rt", "hochPen", "handStd", "handFly", "kExt", "tol"];
   /** Sprintstrecken, deren Bestzeiten Sprint-Tempo nutzt (Schlüssel = Strecke in m). */
   const SPRINT = { "60": "60 m", "100": "100 m", "200": "200 m", "400": "400 m" };
@@ -197,8 +197,12 @@
      { [athleteId]: { goal, level, phase, favs: [Übungs-id], over: { id: { sets, reps, load, note } }, log: [{ date, items: [{ id, sets }] }], updatedAt } }
      goal/level/phase sind Kürzel der jeweiligen Bibliothek (shared/kraft.js, shared/dehnen.js).
      In der Cloud als kind "settings" mit id "<programm>:<athleteId>" (ältere App-Versionen ignorieren das). */
-  const PROGRAMS = { kraft: KEYS.kraft, dehnen: KEYS.dehnen };
-  function cleanProg(k) {
+  // Gleiches Speichermuster (Objekt id → Datensatz mit updatedAt, Cloud-id "<programm>:<id>") auch für
+  // Ziele je Athlet (ziele) und Bestenlisten (rang) – siehe weiter unten; je Programm eigene Prüfung.
+  const PROGRAMS = { kraft: KEYS.kraft, dehnen: KEYS.dehnen, ziele: KEYS.ziele, rang: KEYS.rang };
+  function cleanProg(k, prog) {
+    if (prog === "ziele") return cleanGoals(k);
+    if (prog === "rang") return cleanRank(k);
     if (!k || typeof k !== "object") return null;
     const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n), code = (v) => (/^[a-z]{2,6}$/.test(v) ? v : null), over = {};
     Object.keys(k.over || {}).forEach((id) => { const o = k.over[id] || {};
@@ -213,11 +217,54 @@
       updatedAt: k.updatedAt || new Date().toISOString() };
   }
   function progAll(prog) { const k = load(PROGRAMS[prog], {}); return k && typeof k === "object" && !Array.isArray(k) ? k : {}; }
-  function progFor(prog, athleteId) { return cleanProg(progAll(prog)[athleteId] || { updatedAt: "1970-01-01T00:00:00.000Z" }); }
+  function progFor(prog, athleteId) { return cleanProg(progAll(prog)[athleteId] || { updatedAt: "1970-01-01T00:00:00.000Z" }, prog); }
   function saveProg(prog, athleteId, rec) {
-    const all = progAll(prog); all[athleteId] = cleanProg(Object.assign({}, rec, { updatedAt: new Date().toISOString() }));
+    const all = progAll(prog), k = cleanProg(Object.assign({}, rec, { updatedAt: new Date().toISOString() }), prog);
+    if (k) all[athleteId] = k; else if (all[athleteId]) { delete all[athleteId]; trackDelete("settings", prog + ":" + athleteId); }
     return save(PROGRAMS[prog], all);
   }
+
+  /* ---------- Ziele & Bestenlisten ----------
+     ziele: { [athleteId]: { goals: [{ id, year, disc, venue, goal, ultimate, longterm, note }], updatedAt } }
+       goal/ultimate/longterm als Text wie eingegeben ("11,9x" = irgendwas unter 12,00).
+     rang:  { [listId]: { year, list: "dlv"|"wma", ak, disc, venue, entries: [{ r, v, m }], source, updatedAt } }
+       Bestenliste einer Altersklasse (Rang, Wert, Anzeige) – vollständig oder nur Eckwerte (Platz 10, 30 …). */
+  const VENUES = ["", "indoor", "outdoor"];
+  const RANK_LISTS = { dlv: "DLV", wma: "WMA" };
+  const goalStr = (v) => String(v == null ? "" : v).trim().slice(0, 12);
+  function cleanGoals(k) {
+    if (!k || typeof k !== "object") return null;
+    const goals = (Array.isArray(k.goals) ? k.goals : []).filter((g) => g && Number.isInteger(g.year) && g.year > 1950 && g.year < 2200
+        && typeof g.disc === "string" && g.disc.trim() && goalStr(g.goal))
+      .map((g) => ({ id: typeof g.id === "string" && g.id ? g.id.slice(0, 40) : newId(), year: g.year, disc: g.disc.trim().slice(0, 40),
+        venue: VENUES.includes(g.venue) ? g.venue : "", goal: goalStr(g.goal), ultimate: goalStr(g.ultimate), longterm: goalStr(g.longterm),
+        note: String(g.note == null ? "" : g.note).trim().slice(0, 80) })).slice(0, 200);
+    return { goals, updatedAt: k.updatedAt || new Date().toISOString() };
+  }
+  function cleanRank(k) {
+    if (!k || typeof k !== "object" || !RANK_LISTS[k.list] || !Number.isInteger(k.year) || typeof k.disc !== "string" || !k.disc.trim()) return null;
+    const entries = (Array.isArray(k.entries) ? k.entries : []).filter((e) => e && Number.isInteger(e.r) && e.r > 0 && e.r < 100000
+        && typeof e.v === "number" && e.v > 0)
+      .map((e) => ({ r: e.r, v: e.v, m: String(e.m == null ? "" : e.m).slice(0, 12) })).sort((a, b) => a.r - b.r).slice(0, 2000);
+    if (!entries.length) return null;
+    return { year: k.year, list: k.list, ak: String(k.ak || "").trim().slice(0, 12), disc: k.disc.trim().slice(0, 40),
+      venue: VENUES.includes(k.venue) ? k.venue : "", entries, source: String(k.source == null ? "" : k.source).trim().slice(0, 120),
+      updatedAt: k.updatedAt || new Date().toISOString() };
+  }
+  /** Feste id einer Bestenliste, damit zwei Geräte dieselbe Liste nicht doppelt anlegen. */
+  function rankId(r) {
+    const slug = (x) => String(x || "").toLowerCase().replace(/ß/g, "ss").replace(/[^a-z0-9]+/g, "");
+    return [r.year, r.list, slug(r.ak) || "ak", slug(r.disc), r.venue || "all"].join("-");
+  }
+  function rankLists() { const all = progAll("rang"); return Object.keys(all).map((id) => Object.assign({ id }, cleanRank(all[id]))).filter((x) => x.entries); }
+  function saveRank(rec) {
+    const all = progAll("rang"), id = rankId(rec), k = cleanRank(Object.assign({}, rec, { updatedAt: new Date().toISOString() }));
+    if (rec.id && rec.id !== id && all[rec.id]) { delete all[rec.id]; trackDelete("settings", "rang:" + rec.id); }
+    if (k) all[id] = k; else if (all[id]) { delete all[id]; trackDelete("settings", "rang:" + id); }
+    save(PROGRAMS.rang, all);
+    return k ? id : null;
+  }
+  function deleteRank(id) { const all = progAll("rang"); if (all[id]) { delete all[id]; save(PROGRAMS.rang, all); trackDelete("settings", "rang:" + id); } }
 
   /* ---------- Disziplinen & Bestleistungen ---------- */
   // [Name, Wertung (t=Zeit, d=Weite/Höhe, p=Punkte), Windmessung im Freien]
@@ -280,6 +327,57 @@
     const c = (String(r.mark).match(/:/g) || []).length;
     return c === 2 ? "h" : c === 1 ? "min" : "s";
   }
+  /* ---------- Ergebnis lesen ---------- */
+  const MARK_STATUS = { DNF: "DNF", AUFG: "DNF", DNS: "DNS", DQ: "DQ", DISQ: "DQ", NM: "o.g.V.", OGV: "o.g.V.", NHL: "o.g.V." };
+  /** Liest ein Ergebnis: { mark, value } oder { err }. kind t = Zeit, d = Weite/Höhe, p = Punkte. */
+  function parseMark(raw, kind) {
+    const s = String(raw || "").trim();
+    if (!s) return { err: "Ergebnis fehlt." };
+    const code = s.toUpperCase().replace(/[\s.]/g, "");
+    if (MARK_STATUS[code]) return { mark: MARK_STATUS[code], value: null };
+    let n = s.replace(/\s/g, "").replace(/(min|sek|sec|pkt|punkte|s|m)\.?$/i, "");
+    if (kind === "t") {
+      n = n.replace(/[.,](?=\d{1,3}$)/, ",");
+      const [main, frac, extra] = n.split(",");
+      if (extra !== undefined || !main) return { err: "Zeit bitte wie 11,42 oder 1:58,32 eingeben." };
+      const segs = main.split(/[:.]/);
+      if (segs.length > 3 || segs.some((x) => !/^\d+$/.test(x)) || (frac !== undefined && !/^\d{1,3}$/.test(frac)))
+        return { err: "Zeit bitte wie 11,42 oder 1:58,32 eingeben." };
+      for (let i = 1; i < segs.length; i++) if (+segs[i] > 59 || segs[i].length !== 2) return { err: "Minuten/Sekunden nach dem Doppelpunkt zweistellig (00–59)." };
+      let sec = 0; segs.forEach((x) => { sec = sec * 60 + (+x); });
+      const value = sec + (frac ? +("0." + frac) : 0);
+      if (!(value > 0)) return { err: "Zeit muss größer als 0 sein." };
+      const mark = segs.map((x, i) => (i === 0 ? String(+x) : x)).join(":") + (frac !== undefined ? "," + frac : "");
+      return { mark, value };
+    }
+    if (kind === "d") {
+      if (!/^\d{1,3}([.,]\d{1,2})?$/.test(n)) return { err: "Weite/Höhe in Metern, z. B. 6,45." };
+      const value = +n.replace(",", ".");
+      if (!(value > 0 && value < 150)) return { err: "Weite/Höhe unplausibel." };
+      return { mark: value.toFixed(2).replace(".", ","), value };
+    }
+    if (!/^\d{1,5}$/.test(n.replace(/\./g, ""))) return { err: "Punkte als ganze Zahl, z. B. 5432." };
+    const value = +n.replace(/\./g, "");
+    return { mark: String(value), value };
+  }
+  /**
+   * Zielwert mit Platzhaltern: "11,9x" = alles unter 12,00 (Zeit → x wird 9), "6,4x" = mindestens 6,40 (Weite → x wird 0).
+   * Liefert { mark, value } (value = Grenze, die erreicht werden muss) oder { err }.
+   */
+  function parseGoal(raw, kind) {
+    const s = String(raw || "").trim().replace(/\s/g, "").replace(/X/g, "x");
+    if (!s) return { err: "Ziel fehlt." };
+    const m = s.match(/^(.*?\d[.,]\d*)(x+)$/);
+    if (!m) { const p = parseMark(s, kind); return p.value == null ? { err: p.err || "Ziel unlesbar." } : p; }
+    if (kind === "p") return { err: "Bei Punkten kein x." };
+    const fill = kind === "t" ? "9" : "0", p = parseMark(m[1] + fill.repeat(m[2].length), kind);
+    if (p.err) return p;
+    const dec = (m[1].split(/[.,]/).pop() || "").length + m[2].length;
+    if (dec > 2) return { err: "Höchstens Hundertstel, z. B. 11,9x." };
+    const mark = p.mark.slice(0, p.mark.length - m[2].length) + "x".repeat(m[2].length);
+    return { mark, value: Math.round(p.value * 100) / 100 };
+  }
+
   /* ---------- Altersklassen ----------
      DLV-Regel: maßgeblich ist das Alter, das im Wettkampfjahr erreicht wird (Jahrgang).
      Masters in 5-Jahres-Klassen (M30, M35 …), 23–29 Männer/Frauen, darunter U23, U20, U18
@@ -523,6 +621,9 @@
   }
   function fingerprint() {
     const ev = load(KEYS.events, []), kr = load(KEYS.kraft, null), dh = load(KEYS.dehnen, null), rn = load(KEYS.runs, null);
+    const zi = load(KEYS.ziele, null), rg = load(KEYS.rang, null);
+    if ((zi && Object.keys(zi).length) || (rg && Object.keys(rg).length))
+      return hash(JSON.stringify({ a: load(KEYS.athletes, []), s: tempoSettings(), r: load(KEYS.results, []), e: ev, k: kr, d: dh, n: rn, z: zi, g: rg }));
     if (rn && rn.length) return hash(JSON.stringify({ a: load(KEYS.athletes, []), s: tempoSettings(), r: load(KEYS.results, []), e: ev, k: kr, d: dh, n: rn }));
     if (dh && Object.keys(dh).length) return hash(JSON.stringify({ a: load(KEYS.athletes, []), s: tempoSettings(), r: load(KEYS.results, []), e: ev, k: kr, d: dh }));
     if (kr && Object.keys(kr).length) return hash(JSON.stringify({ a: load(KEYS.athletes, []), s: tempoSettings(), r: load(KEYS.results, []), e: ev, k: kr }));
@@ -561,7 +662,8 @@
 
   async function exportBackup() {
     const data = { app: "leichtathletik", v: 2, exported: new Date().toISOString(),
-      athletes: athletes(), tempoSettings: tempoSettings(), results: results(), events: events(), runs: runs(), kraft: progAll("kraft"), dehnen: progAll("dehnen") };
+      athletes: athletes(), tempoSettings: tempoSettings(), results: results(), events: events(), runs: runs() };
+    Object.keys(PROGRAMS).forEach((pg) => { data[pg] = progAll(pg); });
     const name = "leichtathletik-sicherung-" + new Date().toISOString().slice(0, 10) + ".json";
     const res = await shareOrDownload(name, "application/json", JSON.stringify(data, null, 2));
     if (res !== "aborted") markBackedUp();
@@ -579,7 +681,7 @@
       out.results = Array.isArray(d.results) ? d.results : [];
       out.events = (Array.isArray(d.events) ? d.events : []).map(cleanEvent).filter(Boolean);
       out.runs = (Array.isArray(d.runs) ? d.runs : []).map(cleanRun).filter(Boolean);
-      Object.keys(PROGRAMS).forEach((pg) => { if (d[pg] && typeof d[pg] === "object") Object.keys(d[pg]).forEach((id) => { const k = cleanProg(d[pg][id]); if (k) out[pg][id] = k; }); });
+      Object.keys(PROGRAMS).forEach((pg) => { out[pg] = {}; if (d[pg] && typeof d[pg] === "object") Object.keys(d[pg]).forEach((id) => { const k = cleanProg(d[pg][id], pg); if (k) out[pg][id] = k; }); });
     } else if (d && d.app === "leichtathletik") {
       const t = d.tempo || {};
       out.athletes = (Array.isArray(t.athletes) ? t.athletes : []).map(fromTempoAthlete).filter(Boolean);
@@ -649,12 +751,12 @@
   window.LA = { KEYS, SPRINT, SPRINT_DISTS, PB_MONTHS, load, save, newId, trackDelete, hash, tempoSettings, TEMPO_SETTINGS,
     athletes, saveAthletes, upsertAthlete, deleteAthlete, athleteName,
     results, saveResults, isWindy, isLegal,
-    PROGRAMS, cleanProg, progAll, progFor, saveProg,
+    PROGRAMS, cleanProg, progAll, progFor, saveProg, RANK_LISTS, rankId, rankLists, saveRank, deleteRank, parseMark, parseGoal,
     cleanRun, runs, saveRuns,
     EVENT_KINDS, cleanEvent, events, saveEvents, eventTitle, eventType, daysUntil, eventsToICS,
     DISCIPLINE_GROUPS, STANDARD_DISCIPLINES, DISC, discOrder, normalizeDiscipline, normalizeStoredDisciplines, better, markUnit, bestMarks, ageClass, resultClass, isIsoDate, exactAge,
     CHAMPIONSHIPS, INTL_CHAMPS, canonChamp, champRank, isIntlChamp, championships, titles, readTextFile, parseCSV, toCSV, headerIndex, parseDate, importPreview, columnCountWarnings,
     autoPBs, effectivePBs, setManual, resetToRecorded,
     backupStatus, exportBackup, parseBackup, applyBackup, shareOrDownload,
-    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.33" };
+    fmtDate, fmtTime, esc, plural, registerOffline, VERSION: "2.34" };
 })();

@@ -13,6 +13,11 @@ Offline-Web-App mit mehreren Leichtathletik-Modulen.
 - **Wettkampfergebnisse** (`ergebnisse/`) – Ergebnisse mit Datum, Disziplin, Halle/Freiluft, Ergebnis, Wind,
   Meisterschaft, Platzierung und Kommentar erfassen; Filter nach Jahr, Disziplin, Meisterschaft und Halle/Freiluft;
   Bestleistungen (PB/SB, ohne Rückenwind über +2,0 m/s); CSV-Export für Excel.
+  **Ziele & Einordnung** (`#ziele`, `shared/ziele.js`): Ziele je Athlet und Jahr (Ziel, Ultimate, Langfristig, Notiz;
+  „11,9x“ = unter 12,00, „6,4x“ = mindestens 6,40) und Einordnung der Jahresbestleistung in die DLV- und
+  WMA-Bestenliste der Altersklasse auf einer Achse, für jedes Jahr wählbar. Bestenlisten werden eingefügt (ganze Liste
+  oder Eckwerte wie `10: 11,56`), nicht automatisch geladen. In der Cloud als `kind = 'settings'`,
+  `id = 'ziele:<Athlet>'` bzw. `'rang:<Jahr>-<Liste>-<AK>-<Disziplin>-<Halle/Freiluft>'`.
 - **Kräftigung** (`kraft/`) – 42 Übungen (davon 12 für den Bauch) für den ganzen Körper als Kacheln mit Strichfiguren-Skizze (animierbar),
   Ausführung, Hinweisen, leichter/schwerer und Belastungsempfehlung aus Ziel, Niveau, Trainingsphase und Alter
   (`shared/kraft.js`). Je Athlet: Programm mit ☆-Favoriten, eigene Serien/Wdh./Gewichte, Trainingsmodus mit
