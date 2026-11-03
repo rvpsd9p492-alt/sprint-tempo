@@ -158,9 +158,9 @@
     return '<div class="grow" data-id="' + esc(g.id || "") + '"><div class="grid2">'
       + '<div><label class="fl">Disziplin</label><select data-f="disc">' + discOptions(g.disc) + "</select></div>"
       + '<div><label class="fl">Halle / Freiluft</label><select data-f="venue">' + venueOptions(g.venue, "beides") + "</select></div>"
-      + '<div><label class="fl">Ziel</label><input type="text" data-f="goal" inputmode="decimal" placeholder="z. B. 11,9x" value="' + esc(g.goal || "") + '"></div>'
-      + '<div><label class="fl">Ultimate</label><input type="text" data-f="ultimate" inputmode="decimal" placeholder="optional" value="' + esc(g.ultimate || "") + '"></div>'
-      + '<div><label class="fl">Langfristig</label><input type="text" data-f="longterm" inputmode="decimal" placeholder="optional" value="' + esc(g.longterm || "") + '"></div>'
+      + '<div><label class="fl">Ziel</label><div class="gx"><input type="text" data-f="goal" inputmode="decimal" autocomplete="off" placeholder="z. B. 11,9x" value="' + esc(g.goal || "") + '"><button type="button" class="btn" data-x aria-label="x anhängen (beliebige Ziffer)">x</button></div></div>'
+      + '<div><label class="fl">Ultimate</label><div class="gx"><input type="text" data-f="ultimate" inputmode="decimal" autocomplete="off" placeholder="optional" value="' + esc(g.ultimate || "") + '"><button type="button" class="btn" data-x aria-label="x anhängen (beliebige Ziffer)">x</button></div></div>'
+      + '<div><label class="fl">Langfristig</label><div class="gx"><input type="text" data-f="longterm" inputmode="decimal" autocomplete="off" placeholder="optional" value="' + esc(g.longterm || "") + '"><button type="button" class="btn" data-x aria-label="x anhängen (beliebige Ziffer)">x</button></div></div>'
       + '<div><label class="fl">Notiz</label><input type="text" data-f="note" maxlength="80" placeholder="z. B. 150 m 18,00" value="' + esc(g.note || "") + '"></div>'
       + '</div><div class="row" style="justify-content:space-between;margin-top:6px"><p class="err" data-f="err"></p><button class="btn" type="button" data-del>Entfernen</button></div></div>';
   }
@@ -169,7 +169,7 @@
     const rows = gs.length ? gs : ["60 m", "100 m", "200 m"].map((d) => ({ disc: d, venue: "", goal: "" }));
     return '<div class="gedit"><div id="gRows">' + rows.map(goalRow).join("") + "</div>"
       + '<button class="btn" type="button" id="gAdd">+ Weitere Disziplin</button>'
-      + '<p class="hint">x steht für beliebige Ziffern: „11,9x“ = unter 12,00, „6,4x“ = mindestens 6,40. Leeres Ziel = Zeile wird nicht gespeichert.</p>'
+      + '<p class="hint">x (Taste neben dem Feld) steht für beliebige Ziffern: „11,9x“ = unter 12,00, „6,4x“ = mindestens 6,40. Leeres Ziel = Zeile wird nicht gespeichert.</p>'
       + '<div class="formbtns"><button class="btn primary" type="button" id="gSave">Ziele ' + V.year + ' speichern</button><button class="btn" type="button" id="gCancel">Abbrechen</button></div></div>';
   }
   function saveGoals() {
@@ -314,6 +314,9 @@
       const d = ["60 m", "100 m", "200 m", "400 m", "Weitsprung", "Kugelstoß"].find((x) => !used.includes(x)) || "100 m";
       $("gRows").insertAdjacentHTML("beforeend", goalRow({ disc: d, venue: "", goal: "" })); }
     else if (t.hasAttribute("data-del")) t.closest(".grow").remove();
+    else if (t.hasAttribute("data-x")) { // Ziffernblock auf dem iPhone hat kein x
+      const inp = t.parentNode.querySelector("input"); inp.value = inp.value.trim() + "x"; inp.focus();
+      try { inp.setSelectionRange(inp.value.length, inp.value.length); } catch (e) { /* egal */ } }
     else if (t.id === "rAdd") { rankEdit = { id: null }; render(); $("rEdit").scrollIntoView({ block: "start", behavior: "smooth" }); }
     else if (t.dataset.redit) { rankEdit = { id: t.dataset.redit }; render(); $("rEdit").scrollIntoView({ block: "start", behavior: "smooth" }); }
     else if (t.closest("#rList")) { t.parentNode.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === t))); }
