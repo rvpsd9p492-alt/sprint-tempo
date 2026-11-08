@@ -61,11 +61,11 @@ Kalender-Abo: Migration `20261009100000_la_calendar_feed.sql` (Tabelle `la_calen
 Berechtigung). Wettkämpfe liegen in `la_records` als `kind = 'settings'`, `id = 'event:<id>'`, damit ältere
 App-Versionen sie ignorieren.
 
-Apple Watch: Migrationen `20261015100000_la_quick_result.sql` und `…120000_la_quick_result_runs.sql` (Tabelle
-`la_entry_tokens`, Funktion `la_quick_result`) und Edge-Function `supabase/functions/la-result` (ohne JWT-Prüfung,
+Apple Watch: Migration `20261015100000_la_quick_result.sql` (Tabelle `la_entry_tokens`) und Edge-Function `supabase/functions/la-result` (ohne JWT-Prüfung,
 eigener geheimer Watch-Link). Ein Kurzbefehl ruft `…/functions/v1/la-result?t=<Link>&d=<Strecke>&z=<Zeit>[&o=tief|fliegend][&a=<Athlet>]`
 auf (Stoppuhr-Variante: `&s=<Start>&e=<Stopp>` in Millisekunden des Tages, die Funktion bildet die Differenz)
-und legt über `la_quick_result2` (Migration `20261020090000_la_quick_result2.sql`) einen **Trainingslauf** an;
+und legt über `la_quick_result2` (Migration `20261020090000_la_quick_result2.sql`; die alte Funktion `la_quick_result`
+entfernt `20261108100000_la_drop_quick_result.sql`) einen **Trainingslauf** an;
 die Antwort enthält die Intensität nach dem Sprint-Tempo-Modell (Bestzeiten und Stellschrauben aus der Datenbank) (kind `settings`, id `run:<id>`; Strecken 50, 60, 80, 100, 150, 200, 250 m).
 Trainingsläufe und Anleitung stehen in Sprint-Tempo (Intensität nach dem Modell).
 
