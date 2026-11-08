@@ -133,14 +133,17 @@
       const hero = gs.find((g) => g.disc === "100 m") || gs[0], hk = KIND(hero.disc);
       h += '<div class="ghero"><div class="ghk">Ziel ' + y + "</div><div class=\"ghrow\"><span class=\"ghv\">" + esc(hero.goal) + '</span><span class="ghd">' + esc(discTxt(hero.disc, hero.venue)) + "</span></div></div>";
       h += '<div class="gcards">' + gs.map((g) => {
-        const k = KIND(g.disc), gv = LA.parseGoal(g.goal, k), pb = ak ? bestOf(marks(a.id, { disc: g.disc, venue: g.venue, ak }), k) : null;
+        const k = KIND(g.disc), gv = LA.parseGoal(g.goal, k);
+        // PB der Altersklasse des Zieljahres; im ersten Jahr einer neuen Altersklasse die bisherige Bestleistung mit ihrer Klasse
+        const pbAk = ak ? bestOf(marks(a.id, { disc: g.disc, venue: g.venue, ak }), k) : null;
+        const pb = pbAk || bestOf(marks(a.id, { disc: g.disc, venue: g.venue }), k), pbCls = pb ? (pbAk ? ak : (LA.resultClass(pb, ATH) || {}).label) : "";
         const sbY = bestOf(marks(a.id, { disc: g.disc, venue: g.venue, year: y }), k), sbP = sbY ? null : bestOf(marks(a.id, { disc: g.disc, venue: g.venue, year: y - 1 }), k);
         let st = "";
         if (sbY && gv.value != null) st = atLeast(k, sbY.value, gv.value) ? '<div class="gst ok">✓ erreicht mit ' + esc(sbY.mark) + "</div>"
           : '<div class="gst">noch ' + fmt(Math.abs(sbY.value - gv.value), "d") + (k === "t" ? " s" : " m") + " · SB " + esc(sbY.mark) + "</div>";
         else if (sbP) st = '<div class="gst">SB ' + (y - 1) + " " + esc(sbP.mark) + "</div>";
         return '<div class="gcard"><div class="gd">' + esc(discTxt(g.disc, g.venue)) + "</div>"
-          + '<div class="gpb">' + (pb ? "PB " + esc(pb.mark) + (ak ? ' <span>' + esc(ak) + "</span>" : "") : "PB –") + "</div>"
+          + '<div class="gpb">' + (pb ? "PB " + esc(pb.mark) + (pbCls ? ' <span>' + esc(pbCls) + "</span>" : "") : "PB –") + "</div>"
           + '<div class="gv">' + esc(g.goal) + "</div>"
           + (g.longterm ? '<div class="gl">Langfristig ' + esc(g.longterm) + "</div>" : "")
           + (g.note ? '<div class="gl">' + esc(g.note) + "</div>" : "")
@@ -212,8 +215,9 @@
       const sb = bestOf(marks(a.id, { disc: c.d, venue: c.v, year: y }), k);
       const own = sb || bestOf(marks(a.id, { disc: c.d, venue: c.v, year: ly }), k);
       const ownY = sb ? y : ly;
-      const goal = goalsAll(a.id).find((g) => g.year === y && g.disc === c.d && g.venue === c.v) || goalsAll(a.id).find((g) => g.year === y + 1 && g.disc === c.d && g.venue === c.v)
-        || goalsAll(a.id).find((g) => g.year === y && g.disc === c.d && !g.venue);
+      // Ziel des Jahres, sonst des Folgejahres; passende Halle/Freiluft-Angabe vor „beides“
+      const goal = [y, y + 1].map((yy) => goalsAll(a.id).filter((g) => g.year === yy && g.disc === c.d))
+        .map((l) => l.find((g) => g.venue === c.v) || l.find((g) => !g.venue)).find(Boolean);
       const gv = goal ? LA.parseGoal(goal.goal, k) : null;
       const byList = (id) => c.f.lists.find((l) => l.list === id);
       const ranks = ["dlv", "wma"].map((id) => { const L = byList(id); return L && own ? LA.RANK_LISTS[id] + " " + rankOf(L, own.value, k).txt : null; }).filter(Boolean);

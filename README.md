@@ -77,5 +77,7 @@ Löschungen werden übertragen. Offline-Änderungen werden beim nächsten Online
 - Gemeinsames Design: `shared/base.css`, gemeinsame Funktionen (Speicher, Sicherung, Offline): `shared/common.js`
 - Neues Modul: Ordner mit `index.html` anlegen, Kachel in `index.html` ergänzen, Ordner in `sw.js` (`ASSETS`) eintragen.
 - **Bei jeder Änderung `CACHE` in `sw.js` hochzählen**, sonst laden installierte Geräte neue Dateien nicht vollständig.
+- Tests: `node tests/run.mjs` (Node 22, Playwright mit Chromium) – Seiten, Module, Cloud-Abgleich gegen einen
+  Supabase-Nachbau und die Watch-Funktion `la-result`; Details in [tests/README.md](tests/README.md). Vor jedem Push laufen lassen.
 
 Schrift: Barlow / Barlow Condensed, SIL Open Font License 1.1 (siehe `fonts/LICENSE.txt`).
